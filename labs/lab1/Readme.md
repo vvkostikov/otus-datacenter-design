@@ -8,11 +8,11 @@
 loopback /32
 p2p /31
 
-loopbacks1 Spine N_X 192.168.N0.X
-loopbacks2 Spine N_X 192.168.N1.X (зарезервирован для multicast или иных технических нужд)
-loopbacks1 Leaf N_X 192.168.N2.X
-loopbacks2 Leaf N_X 192.168.N3.X (для VTEP)
-p2p 192.168.N[4-7].X/31 Меньшее число всегда идет на Spine
+loopbacks1 - Spine N-X 192.168.N0.X
+loopbacks2 - Spine N-X 192.168.N1.X (зарезервирован для multicast или иных технических нужд)
+loopbacks1 - Leaf N-X 192.168.N2.X
+loopbacks2 - Leaf N-X 192.168.N3.X (для VTEP)
+p2p 192.168.N[4-7].X/31 (Меньшее число всегда идет на Spine)
 reserved 192.168.N[8-9] (зарезервированы для дальнейшего использования)
 
 
@@ -21,6 +21,10 @@ Overlay:
 10.N.2.0/24 - Prod Servers
 10.N.4.0/24 - NonProd Servers
 10.N.6.0/24 - Prod DMZ
+
+Таблица адресов:
+
+
 
 Настройки коммутаторов:
 SPINE-1-1:
