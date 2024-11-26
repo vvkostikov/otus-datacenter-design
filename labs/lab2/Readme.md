@@ -52,6 +52,7 @@ router ospf 10
 hostname SPINE-1-1
 !
 interface Ethernet1
+   description LEAF-1-1 Eth1
    no switchport
    ip address 192.168.14.0/31
    bfd interval 100 min-rx 100 multiplier 3
@@ -62,6 +63,7 @@ interface Ethernet1
    ip ospf area 0.0.0.0
 !
 interface Ethernet2
+   description LEAF-1-2 Eth1
    no switchport
    ip address 192.168.14.2/31
    bfd interval 100 min-rx 100 multiplier 3
@@ -72,6 +74,7 @@ interface Ethernet2
    ip ospf area 0.0.0.0
 !
 interface Ethernet3
+   description LEAF-1-3 Eth1
    no switchport
    ip address 192.168.14.4/31
    bfd interval 100 min-rx 100 multiplier 3
@@ -102,6 +105,7 @@ router ospf 10
 hostname SPINE-1-2
 !
 interface Ethernet1
+   description LEAF-1-1 Eth2
    no switchport
    ip address 192.168.14.6/31
    bfd interval 100 min-rx 100 multiplier 3
@@ -112,6 +116,7 @@ interface Ethernet1
    ip ospf area 0.0.0.0
 !
 interface Ethernet2
+   description LEAF-1-2 Eth2
    no switchport
    ip address 192.168.14.8/31
    bfd interval 100 min-rx 100 multiplier 3
@@ -122,6 +127,7 @@ interface Ethernet2
    ip ospf area 0.0.0.0
 !
 interface Ethernet3
+   description LEAF-1-3 Eth2
    no switchport
    ip address 192.168.14.10/31
    bfd interval 100 min-rx 100 multiplier 3
@@ -197,6 +203,7 @@ router ospf 10
 hostname LEAF-1-2
 !
 interface Ethernet1
+   description SPINE-1-1 Eth2
    no switchport
    ip address 192.168.14.3/31
    bfd interval 100 min-rx 100 multiplier 3
@@ -207,6 +214,7 @@ interface Ethernet1
    ip ospf area 0.0.0.0
 !
 interface Ethernet2
+   description SPINE-1-2 Eth2
    no switchport
    ip address 192.168.14.9/31
    bfd interval 100 min-rx 100 multiplier 3
@@ -242,6 +250,7 @@ router ospf 10
 hostname LEAF-1-3
 !
 interface Ethernet1
+   description SPINE-1-1 Eth3
    no switchport
    ip address 192.168.14.5/31
    bfd interval 100 min-rx 100 multiplier 3
@@ -252,6 +261,7 @@ interface Ethernet1
    ip ospf area 0.0.0.0
 !
 interface Ethernet2
+   description SPINE-1-2 Eth3
    no switchport
    ip address 192.168.14.11/31
    bfd interval 100 min-rx 100 multiplier 3
