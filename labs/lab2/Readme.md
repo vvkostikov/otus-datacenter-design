@@ -37,7 +37,7 @@ router ospf 10
    no passive-interface Ethernet2
    no passive-interface Ethernet3
 ```
-### Типова конфигурация порта между оммутаторами:
+### Типова конфигурация порта между коммутаторами:
 ```console
    bfd interval 100 min-rx 100 multiplier 3
    ip ospf neighbor bfd
