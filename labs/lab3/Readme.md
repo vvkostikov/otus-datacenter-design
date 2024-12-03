@@ -4,7 +4,7 @@
 
 Loopback IPv6 /128
 
-P2P Subnets Link-Local /64
+P2P Subnets Link-Local /64 (Используется SLAAC)
 
 
 loopbacks1 - Spine N-X 2001:db8::N1:X
@@ -14,8 +14,6 @@ loopbacks2 - Spine N-X 2001:db8::N2:X (зарезервирован для multi
 loopbacks1 - Leaf N-X 2001:db8::N3:X
 
 loopbacks2 - Leaf N-X 2001:db8::N4:X (для VTEP)
-
-P2P LINK-LOCAL/64 (Используется SLAAC)
 
 Идентификатр ISIS: 49.<Номер датацентра N дополненный до 4 знаков>.0000.<последние 8 цифр Loopback разделенные точкой>.
 например для ЦОДа 1 SPINE-1-1 с Loopback1 2001:db8::1:1/128 - net 49.0001.0000.0001.0001
