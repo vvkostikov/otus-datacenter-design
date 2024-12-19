@@ -1,4 +1,4 @@
-# Лабораторная работа 4 "Underlay. BGP"
+# Лабораторная работа 4 "VxLAN. L2 VNI"
 ## Описание принципа выделения адресного пространства Underlay сети:
 Порядковый номер Датацентра - DC N (Нумерация начинается с 1. "0" зарезервирован)
 
@@ -18,9 +18,22 @@ P2P 192.168.N[4-7].X/31 (Меньшее число всегда идет на Sp
 
 reserved 192.168.N[8-9] (зарезервированы для дальнейшего использования)
 
+## Описание VLAN, VNI, RD и RT:
+VNI генерится на основе номера Влана в Датацентре: N0<VLAN ID в 4 значном формате>, где N это порядковый номер Датацентра.
+RD генерится путем составления номера AS и VNI - AS:VNI
+RT на импорт и экспорт по умолчанию генерится из номера AS и VNI - AS:VNI
+
+## Описание адресного пространства Overlay сети:
+
+Создан 1 Влан для серверов 1 Сервиса - Vlan 10 - Service1 - VNI 100010 10.0.0.0/24
+
+Так как мы используем для Датацентра 1 iBGP с номером AS 65000 получаем:
+RD - 65000:100010
+RT - 65000:100010
+
 ## Схема сети:
 
-![alt text](Net_Scheme_Lab4.png)
+![alt text](Net_Scheme_Lab5.png)
 
 ## Таблица адресов:
 | Подсеть ipv4 | Device/Port|    Описание   |
@@ -47,57 +60,112 @@ reserved 192.168.N[8-9] (зарезервированы для дальнейш�
 | 192.168.14.11/31  |  Leaf-1-3 Eth2 |     P2P Spine 1-2 to Leaf 1-3    |
 
 ## Настройки коммутаторов:
-### Типовая конфигурация процесса BGP Spine:
+Использованы шаблоны для ускорения настройки:
+SPINE - Underlay BGP на LEAF в сторону SPINE.
+LEAFS - Underlay BGP на SPINE в торону LEAF.
+OVERLAY - на LEAF и SPINE для настройки EVPN.
+
+Для упрощения настрое SPINE использованы комманды bgp listen range. 
+Что позволяет уйти от ручного указания IP всех соседствующих LEAF.
+
+### Типовая конфигурация процесса BGP Spine UNDERLAY:
 ```console
 router bgp 65000
-   router-id <IP loopback1>
+   router-id <IP Loopback1>
    no bgp default ipv4-unicast
-   no bgp default ipv6-unicast
-   bgp log-neighbor-changes
    distance bgp 20 200 200
-  
+   bgp listen range 192.168.14.0/24 peer-group LEAFS remote-as 65000
    neighbor LEAFS peer group
+   neighbor LEAFS remote-as 65000
    neighbor LEAFS next-hop-self
    neighbor LEAFS bfd
-   neighbor LEAFS remote-as 65000
-   neighbor LEAFS route-reflector-client
    neighbor LEAFS rib-in pre-policy retain all
-   neighbor LEAFS password 0 test123
+   neighbor LEAFS route-reflector-client
+   neighbor LEAFS password 7 1RuAvIkzlaIS2dTpf+q14g==
    neighbor LEAFS send-community standard extended
 
-   neighbor <LEAF PtP IP> peer group LEAFS
-
    address-family ipv4
-   network <Loopback1>
-   neighbor <LEAF PtP IP> activate
+      neighbor LEAFS activate
+      network <IP Loopback1>
+
+```
+### Типовая конфигурация процесса BGP Spine OVERLAY:
+```console
+service routing protocols model multi-agent
+
+router bgp 65000
+   bgp listen range 192.168.12.0/24 peer-group OVERLAY remote-as 65000
+   neighbor OVERLAY peer group
+   neighbor OVERLAY update-source Loopback1
+   neighbor OVERLAY route-reflector-client
+   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
+   neighbor OVERLAY send-community extended
+
+   address-family evpn
+      neighbor OVERLAY activate
    
 ```
-### Типовая конфигурация процесса BGP Leaf:
+### Типовая конфигурация процесса BGP Leaf UNDERLAY:
 ```console
 router bgp 65000
-   router-id <IP loopback1>
+   router-id <IP Loopback1>
    no bgp default ipv4-unicast
-   no bgp default ipv6-unicast
-   bgp log-neighbor-changes
    distance bgp 20 200 200
    maximum-paths 4 ecmp 4
-
    neighbor SPINE peer group
+   neighbor SPINE remote-as 65000
    neighbor SPINE next-hop-self
    neighbor SPINE bfd
-   neighbor SPINE remote-as 65000
    neighbor SPINE rib-in pre-policy retain all
-   neighbor SPINE password 0 test123
+   neighbor SPINE password 7 hFVifvPlyMlVDYT87k+lyg==
    neighbor SPINE send-community standard extended
 
-   neighbor <SPINE PtP IP> peer group SPINE
+   neighbor <SPINE1 PtP IP> peer group SPINE
+   neighbor <SPINE2 PtP IP> peer group SPINE
 
-   address-family ipv4 
-   network <Loopback1>
-   neighbor <SPINE PtP IP> activate
+   address-family ipv4
+      neighbor SPINE activate
+      network <IP Loopback1>
+      network <IP Loopback2>
+```
+
+### Типовая конфигурация процесса BGP Leaf OVERLAY:
+```console
+service routing protocols model multi-agent
+
+router bgp 65000
+   neighbor OVERLAY peer group
+   neighbor OVERLAY remote-as 65000
+   neighbor OVERLAY update-source Loopback1
+   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
+   neighbor OVERLAY send-community extended
+
+   neighbor <SPINE IP Loopback1> peer group OVERLAY
+   neighbor <SPINE IP Loopback2> peer group OVERLAY
+
+   address-family evpn
+      neighbor OVERLAY activate
+
+```
+### Типовая конфигурация процесса BGP Leaf VXLAN:
+```console
+interface Vxlan1
+   vxlan source-interface Loopback2
+   vxlan udp-port 4789
+   vxlan vlan <VLAN ID> vni <VNI ID>
+   vxlan learn-restrict any
+
+router bgp 65000
+  vlan <VLAN ID>
+      rd <AS:VNI>
+      route-target both <AS:VNI>
+      redistribute learned
+
 ```
 ### SPINE-1-1:
 ```console
+!
+service routing protocols model multi-agent
 !
 hostname SPINE-1-1
 !
@@ -128,6 +196,8 @@ router bgp 65000
    router-id 192.168.10.1
    no bgp default ipv4-unicast
    distance bgp 20 200 200
+   bgp listen range 192.168.14.0/24 peer-group LEAFS remote-as 65000
+   bgp listen range 192.168.12.0/24 peer-group OVERLAY remote-as 65000
    neighbor LEAFS peer group
    neighbor LEAFS remote-as 65000
    neighbor LEAFS next-hop-self
@@ -136,19 +206,24 @@ router bgp 65000
    neighbor LEAFS route-reflector-client
    neighbor LEAFS password 7 1RuAvIkzlaIS2dTpf+q14g==
    neighbor LEAFS send-community standard extended
-   neighbor 192.168.14.1 peer group LEAFS
-   neighbor 192.168.14.3 peer group LEAFS
-   neighbor 192.168.14.5 peer group LEAFS
+   neighbor OVERLAY peer group
+   neighbor OVERLAY update-source Loopback1
+   neighbor OVERLAY route-reflector-client
+   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
+   neighbor OVERLAY send-community extended
+   !
+   address-family evpn
+      neighbor OVERLAY activate
    !
    address-family ipv4
-      neighbor 192.168.14.1 activate
-      neighbor 192.168.14.3 activate
-      neighbor 192.168.14.5 activate
+      neighbor LEAFS activate
       network 192.168.10.1/32
 !
 ```
 ### SPINE-1-2:
 ```console
+!
+service routing protocols model multi-agent
 !
 hostname SPINE-1-2
 !
@@ -181,6 +256,8 @@ router bgp 65000
    router-id 192.168.10.2
    no bgp default ipv4-unicast
    distance bgp 20 200 200
+   bgp listen range 192.168.14.0/24 peer-group LEAFS remote-as 65000
+   bgp listen range 192.168.12.0/24 peer-group OVERLAY remote-as 65000
    neighbor LEAFS peer group
    neighbor LEAFS remote-as 65000
    neighbor LEAFS next-hop-self
@@ -189,21 +266,29 @@ router bgp 65000
    neighbor LEAFS route-reflector-client
    neighbor LEAFS password 7 1RuAvIkzlaIS2dTpf+q14g==
    neighbor LEAFS send-community standard extended
-   neighbor 192.168.14.7 peer group LEAFS
-   neighbor 192.168.14.9 peer group LEAFS
-   neighbor 192.168.14.11 peer group LEAFS
+   neighbor OVERLAY peer group
+   neighbor OVERLAY update-source Loopback1
+   neighbor OVERLAY route-reflector-client
+   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
+   neighbor OVERLAY send-community extended
+   !
+   address-family evpn
+      neighbor OVERLAY activate
    !
    address-family ipv4
-      neighbor 192.168.14.7 activate
-      neighbor 192.168.14.9 activate
-      neighbor 192.168.14.11 activate
+      neighbor LEAFS activate
       network 192.168.10.2/32
 !
 ```
 ### LEAF-1-1:
 ```console
 !
+service routing protocols model multi-agent
+!
 hostname LEAF-1-1
+!
+vlan 10
+   name Service1
 !
 interface Ethernet1
    description SPINE-1-1 Eth1
@@ -217,11 +302,21 @@ interface Ethernet2
    ip address 192.168.14.7/31
    bfd interval 700 min-rx 500 multiplier 3
 !
+interface Ethernet8
+   description SERVICE1 SRV1
+   switchport access vlan 10
+!
 interface Loopback1
    ip address 192.168.12.1/32
 !
 interface Loopback2
    ip address 192.168.13.1/32
+!
+interface Vxlan1
+   vxlan source-interface Loopback2
+   vxlan udp-port 4789
+   vxlan vlan 10 vni 100010
+   vxlan learn-restrict any
 !
 ip routing
 !
@@ -230,6 +325,11 @@ router bgp 65000
    no bgp default ipv4-unicast
    distance bgp 20 200 200
    maximum-paths 4 ecmp 4
+   neighbor OVERLAY peer group
+   neighbor OVERLAY remote-as 65000
+   neighbor OVERLAY update-source Loopback1
+   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
+   neighbor OVERLAY send-community extended
    neighbor SPINE peer group
    neighbor SPINE remote-as 65000
    neighbor SPINE next-hop-self
@@ -237,18 +337,29 @@ router bgp 65000
    neighbor SPINE rib-in pre-policy retain all
    neighbor SPINE password 7 hFVifvPlyMlVDYT87k+lyg==
    neighbor SPINE send-community standard extended
+   neighbor 192.168.10.1 peer group OVERLAY
+   neighbor 192.168.10.2 peer group OVERLAY
    neighbor 192.168.14.0 peer group SPINE
    neighbor 192.168.14.6 peer group SPINE
    !
+   vlan 10
+      rd 65000:100010
+      route-target both 65000:100010
+      redistribute learned
+   !
+   address-family evpn
+      neighbor OVERLAY activate
+   !
    address-family ipv4
-      neighbor 192.168.14.0 activate
-      neighbor 192.168.14.6 activate
+      neighbor SPINE activate
       network 192.168.12.1/32
       network 192.168.13.1/32
 !
 ```
 ### LEAF-1-2:
 ```console
+!
+service routing protocols model multi-agent
 !
 hostname LEAF-1-2
 !
@@ -270,6 +381,12 @@ interface Loopback1
 interface Loopback2
    ip address 192.168.13.2/32
 !
+interface Vxlan1
+   vxlan source-interface Loopback2
+   vxlan udp-port 4789
+   vxlan vlan 10 vni 100010
+   vxlan learn-restrict any
+!
 ip routing
 !
 router bgp 65000
@@ -277,6 +394,11 @@ router bgp 65000
    no bgp default ipv4-unicast
    distance bgp 20 200 200
    maximum-paths 4 ecmp 4
+   neighbor OVERLAY peer group
+   neighbor OVERLAY remote-as 65000
+   neighbor OVERLAY update-source Loopback1
+   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
+   neighbor OVERLAY send-community extended
    neighbor SPINE peer group
    neighbor SPINE remote-as 65000
    neighbor SPINE next-hop-self
@@ -284,12 +406,16 @@ router bgp 65000
    neighbor SPINE rib-in pre-policy retain all
    neighbor SPINE password 7 hFVifvPlyMlVDYT87k+lyg==
    neighbor SPINE send-community standard extended
+   neighbor 192.168.10.1 peer group OVERLAY
+   neighbor 192.168.10.2 peer group OVERLAY
    neighbor 192.168.14.2 peer group SPINE
    neighbor 192.168.14.8 peer group SPINE
    !
+   address-family evpn
+      neighbor OVERLAY activate
+   !
    address-family ipv4
-      neighbor 192.168.14.2 activate
-      neighbor 192.168.14.8 activate
+      neighbor SPINE activate
       network 192.168.12.2/32
       network 192.168.13.2/32
 !
@@ -297,7 +423,12 @@ router bgp 65000
 ### LEAF-1-3:
 ```console
 !
+service routing protocols model multi-agent
+!
 hostname LEAF-1-3
+!
+vlan 10
+   name Service1
 !
 interface Ethernet1
    description SPINE-1-1 Eth3
@@ -311,11 +442,21 @@ interface Ethernet2
    ip address 192.168.14.11/31
    bfd interval 700 min-rx 500 multiplier 3
 !
+interface Ethernet7
+   description SERVICE1 SRV4
+   switchport access vlan 10
+!
 interface Loopback1
    ip address 192.168.12.3/32
 !
 interface Loopback2
    ip address 192.168.13.3/32
+!
+interface Vxlan1
+   vxlan source-interface Loopback2
+   vxlan udp-port 4789
+   vxlan vlan 10 vni 100010
+   vxlan learn-restrict any
 !
 ip routing
 !
@@ -324,6 +465,11 @@ router bgp 65000
    no bgp default ipv4-unicast
    distance bgp 20 200 200
    maximum-paths 4 ecmp 4
+   neighbor OVERLAY peer group
+   neighbor OVERLAY remote-as 65000
+   neighbor OVERLAY update-source Loopback1
+   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
+   neighbor OVERLAY send-community extended
    neighbor SPINE peer group
    neighbor SPINE remote-as 65000
    neighbor SPINE next-hop-self
@@ -331,12 +477,21 @@ router bgp 65000
    neighbor SPINE rib-in pre-policy retain all
    neighbor SPINE password 7 hFVifvPlyMlVDYT87k+lyg==
    neighbor SPINE send-community standard extended
+   neighbor 192.168.10.1 peer group OVERLAY
+   neighbor 192.168.10.2 peer group OVERLAY
    neighbor 192.168.14.4 peer group SPINE
    neighbor 192.168.14.10 peer group SPINE
    !
+   vlan 10
+      rd 65000:100010
+      route-target both 65000:100010
+      redistribute learned
+   !
+   address-family evpn
+      neighbor OVERLAY activate
+   !
    address-family ipv4
-      neighbor 192.168.14.4 activate
-      neighbor 192.168.14.10 activate
+      neighbor SPINE activate
       network 192.168.12.3/32
       network 192.168.13.3/32
 !
@@ -345,269 +500,224 @@ router bgp 65000
 ## Вывод комманд маршрутизации
 ### SPINE-1-1:
 ```console
-sh ip route
- C        192.168.10.1/32 is directly connected, Loopback1
- B I      192.168.12.1/32 [200/0] via 192.168.14.1, Ethernet1
- B I      192.168.12.2/32 [200/0] via 192.168.14.3, Ethernet2
- B I      192.168.12.3/32 [200/0] via 192.168.14.5, Ethernet3
- B I      192.168.13.1/32 [200/0] via 192.168.14.1, Ethernet1
- B I      192.168.13.2/32 [200/0] via 192.168.14.3, Ethernet2
- B I      192.168.13.3/32 [200/0] via 192.168.14.5, Ethernet3
- C        192.168.14.0/31 is directly connected, Ethernet1
- C        192.168.14.2/31 is directly connected, Ethernet2
- C        192.168.14.4/31 is directly connected, Ethernet3
-!
-sh ip bgp summary 
+sh bgp evpn summary 
+BGP summary information for VRF default
 Router identifier 192.168.10.1, local AS number 65000
 Neighbor Status Codes: m - Under maintenance
-  Neighbor         V  AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
-  192.168.14.1     4  65000             34        36    0    0 00:29:08 Estab   2      2
-  192.168.14.3     4  65000             23        27    0    0 00:16:34 Estab   2      2
-  192.168.14.5     4  65000             19        22    0    0 00:13:51 Estab   2      2
-!
-ping 192.168.12.1 source 192.168.10.1
-PING 192.168.12.1 (192.168.12.1) from 192.168.10.1 : 72(100) bytes of data.
-80 bytes from 192.168.12.1: icmp_seq=1 ttl=64 time=8.79 ms
-80 bytes from 192.168.12.1: icmp_seq=2 ttl=64 time=6.13 ms
-80 bytes from 192.168.12.1: icmp_seq=3 ttl=64 time=8.65 ms
-80 bytes from 192.168.12.1: icmp_seq=4 ttl=64 time=6.79 ms
-80 bytes from 192.168.12.1: icmp_seq=5 ttl=64 time=11.9 ms
-
---- 192.168.12.1 ping statistics ---
-5 packets transmitted, 5 received, 0% packet loss, time 46ms
-rtt min/avg/max/mdev = 6.131/8.468/11.969/2.033 ms, ipg/ewma 11.621/8.736 ms
+  Neighbor     V AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
+  192.168.12.1 4 65000             60        63    0    0 00:46:08 Estab   1      1
+  192.168.12.2 4 65000             57        64    0    0 00:46:06 Estab   0      0
+  192.168.12.3 4 65000             61        56    0    0 00:46:06 Estab   1      1
 ```
 ### SPINE-1-2:
 ```console
-sh ip route
- C        192.168.10.2/32 is directly connected, Loopback1
- B I      192.168.12.1/32 [200/0] via 192.168.14.7, Ethernet1
- B I      192.168.12.2/32 [200/0] via 192.168.14.9, Ethernet2
- B I      192.168.12.3/32 [200/0] via 192.168.14.11, Ethernet3
- B I      192.168.13.1/32 [200/0] via 192.168.14.7, Ethernet1
- B I      192.168.13.2/32 [200/0] via 192.168.14.9, Ethernet2
- B I      192.168.13.3/32 [200/0] via 192.168.14.11, Ethernet3
- C        192.168.14.6/31 is directly connected, Ethernet1
- C        192.168.14.8/31 is directly connected, Ethernet2
- C        192.168.14.10/31 is directly connected, Ethernet3
-!
-sh ip bgp summary 
+SPINE-1-2#sh bgp evpn summary 
+BGP summary information for VRF default
 Router identifier 192.168.10.2, local AS number 65000
 Neighbor Status Codes: m - Under maintenance
-  Neighbor         V  AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
-  192.168.14.7     4  65000             30        35    0    0 00:22:04 Estab   2      2
-  192.168.14.9     4  65000             24        27    0    0 00:18:29 Estab   2      2
-  192.168.14.11    4  65000             20        22    0    0 00:15:43 Estab   2      2
-!
-ping 192.168.12.3 source 192.168.10.2
-PING 192.168.12.3 (192.168.12.3) from 192.168.10.2 : 72(100) bytes of data.
-80 bytes from 192.168.12.3: icmp_seq=1 ttl=64 time=8.64 ms
-80 bytes from 192.168.12.3: icmp_seq=2 ttl=64 time=6.53 ms
-80 bytes from 192.168.12.3: icmp_seq=3 ttl=64 time=6.10 ms
-80 bytes from 192.168.12.3: icmp_seq=4 ttl=64 time=7.00 ms
-80 bytes from 192.168.12.3: icmp_seq=5 ttl=64 time=7.72 ms
-
---- 192.168.12.3 ping statistics ---
-5 packets transmitted, 5 received, 0% packet loss, time 47ms
-rtt min/avg/max/mdev = 6.101/7.200/8.647/0.906 ms, ipg/ewma 11.785/7.930 ms
+  Neighbor     V AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
+  192.168.12.1 4 65000             60        62    0    0 00:46:33 Estab   1      1
+  192.168.12.2 4 65000             59        64    0    0 00:46:38 Estab   0      0
+  192.168.12.3 4 65000             62        60    0    0 00:46:38 Estab   1      1
 ```
 ### LEAF-1-1:
 ```console
-sh ip route
- B I      192.168.10.1/32 [200/0] via 192.168.14.0, Ethernet1
- B I      192.168.10.2/32 [200/0] via 192.168.14.6, Ethernet2
- C        192.168.12.1/32 is directly connected, Loopback1
- B I      192.168.12.2/32 [200/0] via 192.168.14.0, Ethernet1
-                                  via 192.168.14.6, Ethernet2
- B I      192.168.12.3/32 [200/0] via 192.168.14.0, Ethernet1
-                                  via 192.168.14.6, Ethernet2
- C        192.168.13.1/32 is directly connected, Loopback2
- B I      192.168.13.2/32 [200/0] via 192.168.14.0, Ethernet1
-                                  via 192.168.14.6, Ethernet2
- B I      192.168.13.3/32 [200/0] via 192.168.14.0, Ethernet1
-                                  via 192.168.14.6, Ethernet2
- C        192.168.14.0/31 is directly connected, Ethernet1
- C        192.168.14.6/31 is directly connected, Ethernet2
-!
-sh ip bgp summary 
+sh bgp evpn summary 
 BGP summary information for VRF default
 Router identifier 192.168.12.1, local AS number 65000
 Neighbor Status Codes: m - Under maintenance
-  Neighbor         V  AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
-  192.168.14.0     4  65000             40        39    0    0 00:32:27 Estab   5      5
-  192.168.14.6     4  65000             30        28    0    0 00:23:28 Estab   5      5
+  Neighbor     V AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
+  192.168.10.1 4 65000             65        62    0    0 00:47:56 Estab   1      1
+  192.168.10.2 4 65000             64        61    0    0 00:47:47 Estab   1      1
 !
-sh ip bgp 192.168.13.3
+sh interfaces vxlan 1
+Vxlan1 is up, line protocol is up (connected)
+  Hardware is Vxlan
+  Source interface is Loopback2 and is active with 192.168.13.1
+  Listening on UDP port 4789
+  Replication/Flood Mode is headend with Flood List Source: EVPN
+  Remote MAC learning via EVPN
+  VNI mapping to VLANs
+  Static VLAN to VNI mapping is 
+    [10, 100010]     
+  Note: All Dynamic VLANs used by VCS are internal VLANs.
+        Use 'show vxlan vni' for details.
+  Static VRF to VNI mapping is not configured
+  Headend replication flood vtep list is:
+    10 192.168.13.3   
+  Shared Router MAC is 0000.0000.0000
+!
+sh vxlan vtep
+Remote VTEPS for Vxlan1:
+
+VTEP               Tunnel Type(s)
+------------------ --------------
+192.168.13.3       flood         
+
+Total number of remote VTEPS:  1
+!
+#sh vxlan address-table
+          Vxlan Mac Address Table
+----------------------------------------------------------------------
+
+VLAN  Mac Address     Type      Prt  VTEP             Moves   Last Move
+----  -----------     ----      ---  ----             -----   ---------
+  10  0050.7966.6809  EVPN      Vx1  192.168.13.3     1       0:00:05 ago
+Total Remote Mac Addresses for this criterion: 1
+!
+sh bgp evpn route-type mac-ip 
 BGP routing table information for VRF default
 Router identifier 192.168.12.1, local AS number 65000
-BGP routing table entry for 192.168.13.3/32
- Paths: 2 available
-  Local
-    192.168.14.0 from 192.168.14.0 (192.168.10.1)
-      Origin IGP, metric 0, localpref 100, IGP metric 1, weight 0, received 00:18:31 ago, valid, internal, ECMP head, ECMP, best, ECMP contributor
-      Originator: 192.168.12.3, Cluster list: 192.168.10.1
-      Rx SAFI: Unicast
-  Local
-    192.168.14.6 from 192.168.14.6 (192.168.10.2)
-      Origin IGP, metric 0, localpref 100, IGP metric 1, weight 0, received 00:18:28 ago, valid, internal, ECMP, ECMP contributor
-      Originator: 192.168.12.3, Cluster list: 192.168.10.2
-      Rx SAFI: Unicast
+Route status codes: * - valid, > - active, S - Stale, E - ECMP head, e - ECMP
+                    c - Contributing to ECMP, % - Pending BGP convergence
+Origin codes: i - IGP, e - EGP, ? - incomplete
+AS Path Attributes: Or-ID - Originator ID, C-LST - Cluster List, LL Nexthop - Link Local Nexthop
+
+          Network                Next Hop              Metric  LocPref Weight  Path
+ * >      RD: 65000:100010 mac-ip 0050.7966.6806
+                                 -                     -       -       0       i
+ * >Ec    RD: 65000:100010 mac-ip 0050.7966.6809
+                                 192.168.13.3          -       100     0       i Or-ID: 192.168.12.3 C-LST: 192.168.10.1 
+ *  ec    RD: 65000:100010 mac-ip 0050.7966.6809
+                                 192.168.13.3          -       100     0       i Or-ID: 192.168.12.3 C-LST: 192.168.10.2 
 !
-ping 192.168.12.3 source 192.168.12.1
-PING 192.168.12.3 (192.168.12.3) from 192.168.12.1 : 72(100) bytes of data.
-80 bytes from 192.168.12.3: icmp_seq=1 ttl=63 time=24.5 ms
-80 bytes from 192.168.12.3: icmp_seq=2 ttl=63 time=24.9 ms
-80 bytes from 192.168.12.3: icmp_seq=3 ttl=63 time=20.5 ms
-80 bytes from 192.168.12.3: icmp_seq=4 ttl=63 time=21.7 ms
-80 bytes from 192.168.12.3: icmp_seq=5 ttl=63 time=15.0 ms
-
---- 192.168.12.3 ping statistics ---
-5 packets transmitted, 5 received, 0% packet loss, time 95ms
-rtt min/avg/max/mdev = 15.001/21.358/24.902/3.583 ms, pipe 2, ipg/ewma 23.964/22.718 ms
-
-ping 192.168.13.3 source 192.168.13.1
-PING 192.168.13.3 (192.168.13.3) from 192.168.13.1 : 72(100) bytes of data.
-80 bytes from 192.168.13.3: icmp_seq=1 ttl=63 time=27.9 ms
-80 bytes from 192.168.13.3: icmp_seq=2 ttl=63 time=18.0 ms
-80 bytes from 192.168.13.3: icmp_seq=3 ttl=63 time=22.0 ms
-80 bytes from 192.168.13.3: icmp_seq=4 ttl=63 time=35.7 ms
-80 bytes from 192.168.13.3: icmp_seq=5 ttl=63 time=20.0 ms
-
---- 192.168.13.3 ping statistics ---
-5 packets transmitted, 5 received, 0% packet loss, time 92ms
-rtt min/avg/max/mdev = 18.080/24.776/35.734/6.409 ms, pipe 2, ipg/ewma 23.121/26.439 ms
 ```
 ### LEAF-1-2:
 ```console
-sh ip route
- B I      192.168.10.1/32 [200/0] via 192.168.14.2, Ethernet1
- B I      192.168.10.2/32 [200/0] via 192.168.14.8, Ethernet2
- B I      192.168.12.1/32 [200/0] via 192.168.14.2, Ethernet1
-                                  via 192.168.14.8, Ethernet2
- C        192.168.12.2/32 is directly connected, Loopback1
- B I      192.168.12.3/32 [200/0] via 192.168.14.2, Ethernet1
-                                  via 192.168.14.8, Ethernet2
- B I      192.168.13.1/32 [200/0] via 192.168.14.2, Ethernet1
-                                  via 192.168.14.8, Ethernet2
- C        192.168.13.2/32 is directly connected, Loopback2
- B I      192.168.13.3/32 [200/0] via 192.168.14.2, Ethernet1
-                                  via 192.168.14.8, Ethernet2
- C        192.168.14.2/31 is directly connected, Ethernet1
- C        192.168.14.8/31 is directly connected, Ethernet2
-!
-sh ip bgp summary 
+sh bgp evpn summary 
+BGP summary information for VRF default
 Router identifier 192.168.12.2, local AS number 65000
 Neighbor Status Codes: m - Under maintenance
-  Neighbor         V  AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
-  192.168.14.2     4  65000             31        29    0    0 00:22:00 Estab   5      5
-  192.168.14.8     4  65000             29        27    0    0 00:22:00 Estab   5      5
+  Neighbor     V AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
+  192.168.10.1 4 65000             74        66    0    0 00:53:34 Estab   4      4
+  192.168.10.2 4 65000             74        66    0    0 00:53:31 Estab   4      4
 !
-sh ip bgp neighbors 192.168.14.2 received-routes 
+Vxlan1 is down, line protocol is down (notconnect)
+  Hardware is Vxlan
+  Source interface is Loopback2 and is active with 192.168.13.2
+  Listening on UDP port 4789
+  Replication/Flood Mode is not initialized yet
+  Remote MAC learning via Datapath
+  VNI mapping to VLANs
+  Static VLAN to VNI mapping is not configured
+  Static VRF to VNI mapping is not configured
+  Shared Router MAC is 0000.0000.0000
+!
+sh vxla vtep 
+Remote VTEPS for Vxlan1:
+
+VTEP       Tunnel Type(s)
+---------- --------------
+
+Total number of remote VTEPS:  0
+!
+sh vxlan address-table 
+          Vxlan Mac Address Table
+----------------------------------------------------------------------
+
+VLAN  Mac Address     Type      Prt  VTEP             Moves   Last Move
+----  -----------     ----      ---  ----             -----   ---------
+Total Remote Mac Addresses for this criterion: 0
+!
+sh bgp evpn route-type mac-ip 
+BGP routing table information for VRF default
 Router identifier 192.168.12.2, local AS number 65000
-         Network                Next Hop            Metric  LocPref Weight  Path
- * >     192.168.10.1/32        192.168.14.2          -       100     -       i
- * >Ec   192.168.12.1/32        192.168.14.2          -       100     -       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1
- * >Ec   192.168.12.3/32        192.168.14.2          -       100     -       i Or-ID: 192.168.12.3 C-LST: 192.168.10.1
- * >Ec   192.168.13.1/32        192.168.14.2          -       100     -       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1
- * >Ec   192.168.13.3/32        192.168.14.2          -       100     -       i Or-ID: 192.168.12.3 C-LST: 192.168.10.1
+Route status codes: * - valid, > - active, S - Stale, E - ECMP head, e - ECMP
+                    c - Contributing to ECMP, % - Pending BGP convergence
+Origin codes: i - IGP, e - EGP, ? - incomplete
+AS Path Attributes: Or-ID - Originator ID, C-LST - Cluster List, LL Nexthop - Link Local Nexthop
+
+          Network                Next Hop              Metric  LocPref Weight  Path
+ * >Ec    RD: 65000:100010 mac-ip 0050.7966.6806
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
+ *  ec    RD: 65000:100010 mac-ip 0050.7966.6806
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >Ec    RD: 65000:100010 mac-ip 0050.7966.6809
+                                 192.168.13.3          -       100     0       i Or-ID: 192.168.12.3 C-LST: 192.168.10.2 
+ *  ec    RD: 65000:100010 mac-ip 0050.7966.6809
+                                 192.168.13.3          -       100     0       i Or-ID: 192.168.12.3 C-LST: 192.168.10.1 
 !
-sh ip bgp 192.168.13.3
-Router identifier 192.168.12.2, local AS number 65000
-BGP routing table entry for 192.168.13.3/32
- Paths: 2 available
-  Local
-    192.168.14.2 from 192.168.14.2 (192.168.10.1)
-      Origin IGP, metric 0, localpref 100, IGP metric 1, weight 0, received 00:21:18 ago, valid, internal, ECMP head, ECMP, best, ECMP contributor
-      Originator: 192.168.12.3, Cluster list: 192.168.10.1
-      Rx SAFI: Unicast
-  Local
-    192.168.14.8 from 192.168.14.8 (192.168.10.2)
-      Origin IGP, metric 0, localpref 100, IGP metric 1, weight 0, received 00:21:15 ago, valid, internal, ECMP, ECMP contributor
-      Originator: 192.168.12.3, Cluster list: 192.168.10.2
-      Rx SAFI: Unicast
-!
-ping 192.168.12.1 source 192.168.12.2
-PING 192.168.12.1 (192.168.12.1) from 192.168.12.2 : 72(100) bytes of data.
-80 bytes from 192.168.12.1: icmp_seq=1 ttl=63 time=18.9 ms
-80 bytes from 192.168.12.1: icmp_seq=2 ttl=63 time=39.3 ms
-80 bytes from 192.168.12.1: icmp_seq=3 ttl=63 time=23.4 ms
-80 bytes from 192.168.12.1: icmp_seq=4 ttl=63 time=17.7 ms
-80 bytes from 192.168.12.1: icmp_seq=5 ttl=63 time=14.7 ms
-
---- 192.168.12.1 ping statistics ---
-5 packets transmitted, 5 received, 0% packet loss, time 77ms
-rtt min/avg/max/mdev = 14.711/22.834/39.346/8.724 ms, pipe 2, ipg/ewma 19.425/20.409 ms
-
-ping 192.168.13.3 source 192.168.13.2
-PING 192.168.13.3 (192.168.13.3) from 192.168.13.2 : 72(100) bytes of data.
-80 bytes from 192.168.13.3: icmp_seq=1 ttl=63 time=20.8 ms
-80 bytes from 192.168.13.3: icmp_seq=2 ttl=63 time=19.1 ms
-80 bytes from 192.168.13.3: icmp_seq=3 ttl=63 time=19.7 ms
-80 bytes from 192.168.13.3: icmp_seq=4 ttl=63 time=22.5 ms
-80 bytes from 192.168.13.3: icmp_seq=5 ttl=63 time=25.4 ms
-
---- 192.168.13.3 ping statistics ---
-5 packets transmitted, 5 received, 0% packet loss, time 78ms
-rtt min/avg/max/mdev = 19.156/21.546/25.422/2.257 ms, pipe 2, ipg/ewma 19.620/21.358 ms
 ```
 ### LEAF-1-3:
 ```console
-sh ip route
- B I      192.168.10.1/32 [200/0] via 192.168.14.4, Ethernet1
- B I      192.168.10.2/32 [200/0] via 192.168.14.10, Ethernet2
- B I      192.168.12.1/32 [200/0] via 192.168.14.4, Ethernet1
-                                  via 192.168.14.10, Ethernet2
- B I      192.168.12.2/32 [200/0] via 192.168.14.4, Ethernet1
-                                  via 192.168.14.10, Ethernet2
- C        192.168.12.3/32 is directly connected, Loopback1
- B I      192.168.13.1/32 [200/0] via 192.168.14.4, Ethernet1
-                                  via 192.168.14.10, Ethernet2
- B I      192.168.13.2/32 [200/0] via 192.168.14.4, Ethernet1
-                                  via 192.168.14.10, Ethernet2
- C        192.168.13.3/32 is directly connected, Loopback2
- C        192.168.14.4/31 is directly connected, Ethernet1
- C        192.168.14.10/31 is directly connected, Ethernet2
-!
-sh ip bgp summary 
+sh bgp evpn summary 
+BGP summary information for VRF default
 Router identifier 192.168.12.3, local AS number 65000
 Neighbor Status Codes: m - Under maintenance
-  Neighbor         V  AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
-  192.168.14.4     4  65000             30        28    0    0 00:23:50 Estab   5      5
-  192.168.14.10    4  65000             30        28    0    0 00:23:47 Estab   5      5
+  Neighbor     V AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
+  192.168.10.1 4 65000             68        74    0    0 00:55:40 Estab   2      2
+  192.168.10.2 4 65000             70        74    0    0 00:55:38 Estab   2      2
 !
-sh ip bgp 192.168.13.1
+sh interfaces vxlan 1
+Vxlan1 is up, line protocol is up (connected)
+  Hardware is Vxlan
+  Source interface is Loopback2 and is active with 192.168.13.3
+  Listening on UDP port 4789
+  Replication/Flood Mode is headend with Flood List Source: EVPN
+  Remote MAC learning via EVPN
+  VNI mapping to VLANs
+  Static VLAN to VNI mapping is 
+    [10, 100010]     
+  Note: All Dynamic VLANs used by VCS are internal VLANs.
+        Use 'show vxlan vni' for details.
+  Static VRF to VNI mapping is not configured
+  Headend replication flood vtep list is:
+    10 192.168.13.1   
+  Shared Router MAC is 0000.0000.0000
+!
+sh vxlan vtep 
+Remote VTEPS for Vxlan1:
+
+VTEP               Tunnel Type(s)
+------------------ --------------
+192.168.13.1       unicast, flood
+
+Total number of remote VTEPS:  1
+!
+sh vxlan address-table 
+          Vxlan Mac Address Table
+----------------------------------------------------------------------
+
+VLAN  Mac Address     Type      Prt  VTEP             Moves   Last Move
+----  -----------     ----      ---  ----             -----   ---------
+  10  0050.7966.6806  EVPN      Vx1  192.168.13.1     1       0:04:47 ago
+Total Remote Mac Addresses for this criterion: 1
+!
+sh bgp evpn route-type mac-ip 
+BGP routing table information for VRF default
 Router identifier 192.168.12.3, local AS number 65000
-BGP routing table entry for 192.168.13.1/32
- Paths: 2 available
-  Local
-    192.168.14.4 from 192.168.14.4 (192.168.10.1)
-      Origin IGP, metric 0, localpref 100, IGP metric 1, weight 0, received 00:24:09 ago, valid, internal, ECMP head, ECMP, best, ECMP contributor
-      Originator: 192.168.12.1, Cluster list: 192.168.10.1
-      Rx SAFI: Unicast
-  Local
-    192.168.14.10 from 192.168.14.10 (192.168.10.2)
-      Origin IGP, metric 0, localpref 100, IGP metric 1, weight 0, received 00:24:06 ago, valid, internal, ECMP, ECMP contributor
-      Originator: 192.168.12.1, Cluster list: 192.168.10.2
-      Rx SAFI: Unicast
+Route status codes: * - valid, > - active, S - Stale, E - ECMP head, e - ECMP
+                    c - Contributing to ECMP, % - Pending BGP convergence
+Origin codes: i - IGP, e - EGP, ? - incomplete
+AS Path Attributes: Or-ID - Originator ID, C-LST - Cluster List, LL Nexthop - Link Local Nexthop
+
+          Network                Next Hop              Metric  LocPref Weight  Path
+ * >Ec    RD: 65000:100010 mac-ip 0050.7966.6806
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
+ *  ec    RD: 65000:100010 mac-ip 0050.7966.6806
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65000:100010 mac-ip 0050.7966.6809
+                                 -                     -       -       0       i
 !
-ping 192.168.12.1 source 192.168.12.3
-PING 192.168.12.1 (192.168.12.1) from 192.168.12.3 : 72(100) bytes of data.
-80 bytes from 192.168.12.1: icmp_seq=1 ttl=63 time=16.7 ms
-80 bytes from 192.168.12.1: icmp_seq=2 ttl=63 time=74.3 ms
+```
+### VPC1:
+```console
+VPC1> ping 10.0.0.14   
 
---- 192.168.12.1 ping statistics ---
-5 packets transmitted, 2 received, 60% packet loss, time 66ms
-rtt min/avg/max/mdev = 16.793/45.588/74.384/28.796 ms, pipe 4, ipg/ewma 16.744/23.991 ms
+84 bytes from 10.0.0.14 icmp_seq=1 ttl=64 time=36.250 ms
+84 bytes from 10.0.0.14 icmp_seq=2 ttl=64 time=33.159 ms
+84 bytes from 10.0.0.14 icmp_seq=3 ttl=64 time=33.556 ms
+84 bytes from 10.0.0.14 icmp_seq=4 ttl=64 time=43.787 ms
+84 bytes from 10.0.0.14 icmp_seq=5 ttl=64 time=37.648 ms
+```
 
-ping 192.168.13.1 source 192.168.13.3
-PING 192.168.13.1 (192.168.13.1) from 192.168.13.3 : 72(100) bytes of data.
-80 bytes from 192.168.13.1: icmp_seq=1 ttl=63 time=21.0 ms
-80 bytes from 192.168.13.1: icmp_seq=2 ttl=63 time=19.3 ms
-80 bytes from 192.168.13.1: icmp_seq=3 ttl=63 time=16.3 ms
-80 bytes from 192.168.13.1: icmp_seq=4 ttl=63 time=25.5 ms
-80 bytes from 192.168.13.1: icmp_seq=5 ttl=63 time=22.8 ms
+### VPC4:
+```console
+VPC4> ping 10.0.0.11
 
---- 192.168.13.1 ping statistics ---
-5 packets transmitted, 5 received, 0% packet loss, time 77ms
-rtt min/avg/max/mdev = 16.350/21.035/25.562/3.115 ms, pipe 2, ipg/ewma 19.295/21.182 ms
+84 bytes from 10.0.0.11 icmp_seq=1 ttl=64 time=37.108 ms
+84 bytes from 10.0.0.11 icmp_seq=2 ttl=64 time=32.512 ms
+84 bytes from 10.0.0.11 icmp_seq=3 ttl=64 time=36.826 ms
+84 bytes from 10.0.0.11 icmp_seq=4 ttl=64 time=36.060 ms
+84 bytes from 10.0.0.11 icmp_seq=5 ttl=64 time=37.045 ms
 ```
