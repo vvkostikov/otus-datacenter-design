@@ -65,11 +65,14 @@ RT - 65000:100010
 
 ## Настройки коммутаторов:
 Использованы шаблоны для ускорения настройки:
+
 SPINE - Underlay BGP на LEAF в сторону SPINE.
+
 LEAFS - Underlay BGP на SPINE в торону LEAF.
+
 OVERLAY - на LEAF и SPINE для настройки EVPN.
 
-Для упрощения настрое SPINE использованы комманды bgp listen range. 
+Для упрощения настройки SPINE использованы комманды bgp listen range. 
 Что позволяет уйти от ручного указания IP всех соседствующих LEAF.
 
 ### Типовая конфигурация процесса BGP Spine UNDERLAY:
