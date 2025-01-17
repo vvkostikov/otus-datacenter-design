@@ -181,8 +181,8 @@ router bgp 65000
    neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
    neighbor OVERLAY send-community extended
 
-   neighbor <SPINE IP Loopback1> peer group OVERLAY
-   neighbor <SPINE IP Loopback2> peer group OVERLAY
+   neighbor <SPINE1 IP Loopback1> peer group OVERLAY
+   neighbor <SPINE2 IP Loopback1> peer group OVERLAY
 
    address-family evpn
       neighbor OVERLAY activate
