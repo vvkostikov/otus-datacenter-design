@@ -1,6 +1,6 @@
 # Проектная работа "Построение растянутой L2 сети между датацентрами предприятия с использованием технологии VXLAN EVPN MultiSite."
 ## Презентация:
-[Шаблон](labs/project/presentation/Шаблон защиты проектов для студентов.pptx)
+[Шаблон](labs/project/presentation/'Шаблон защиты проектов для студентов.pptx')
 
 [Презентация](labs/project/presentation/Presentation.pptx)
 ## Описание проекта:
