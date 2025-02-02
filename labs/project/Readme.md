@@ -1,4 +1,33 @@
 # Проектная работа "Построение растянутой L2 сети между датацентрами предприятия с использованием технологии VXLAN EVPN MultiSite."
+## Презентация:
+[Шаблон](labs/project/presentation/Шаблон защиты проектов для студентов.pptx)
+
+[Презентация](labs/project/presentation/Presentation.pptx)
+## Описание проекта:
+Работа призвана отразить полученные навыки в проектировании сетей Датацентров с использованием тезнологии VXLAN EVPN и применением варианта построения взаимодействия между независимыми датацентрами на основе тезнологии VXLAN.
+
+В данной задачи рассматривается проектирование адресного пространства и типовых конфигурация с использованием "шаблонов" для нескольких датацентров.
+
+Все принципы и конфигурации описываются далее по тексту.
+
+Работа строилась на концепции расширения вычислительного поля компании за счет строительства и подключения второго Датацентра предприятия.
+
+С Учетом предъявляемых требования от Виртуализации и непосредственно администраторов сервисов предполагалось заложить возможность использовать как L2 так и L3 варианты взаимодействия систем между собой.
+
+Все оборудование должно быть задублировано.
+
+Подключение конечный устройств к коммутаторам фабрики предполагает использование технологии Multihoming EVPN.
+
+Взаимодействие между Подразделениями на данном этапе не предполагается. В дальнейшем запланирована сборка внешнего Фаервола для организации VRF Lite.
+
+## Ограничения стенда:
+
+Выключен BFD и отсутсвует в конфигах с устройств. Слишком высокая нагрузка.
+
+Финальный этап тестирования так же выполнялся с частью оборудования в выкюченном состоянии из-за нагрузки на стенд.
+
+Так как не хватало ресурсов технология Multihoming EVPN описана в виде шаблонов конфигов, но отсутсвует в финальном выводе команд.
+
 ## Описание принципа выделения адресного пространства Underlay сети:
 Порядковый номер Датацентра - DC N (Нумерация начинается с 1. "0" зарезервирован)
 
@@ -90,6 +119,15 @@ lacp system-id 0001.0002.0001
 ip virtual-router mac-address 0001.00d5.5dc0
 
 ## Описание DCI:
+### Описание выбора RT для DCI:
+
+Для L2 VNI, котоыре требуются растянуть между Датацентрами указывает отдельный RT  удаленного домена:
+
+65500:VNI
+
+Для L3 VNI не зависимо от потребностей в передачи между датацентрами используется общий RT:
+
+65000:VNI
 
 ### Описание выбора BGW и схемы подключения:
 
@@ -378,6 +416,9 @@ router bgp 65XXXX
 [LEAF-2-4](/labs/project/configs/LEAF-2-4_cfg.txt)
 
 ## Вывод комманд маршрутизации
+
+Из-за ограничений по мощности стенда часть оборудования была выключена на момент сбора комманд. Поэтмоу сбор выполнялся с части оборудования, а так же может содержать не все оборудование описанное выше.
+
 ### SPINE-1-1:
 ```console
 sh bgp evpn summary 
@@ -385,37 +426,36 @@ BGP summary information for VRF default
 Router identifier 192.168.10.1, local AS number 65000
 Neighbor Status Codes: m - Under maintenance
   Neighbor     V AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
-  192.168.12.1 4 65000           3024      2022    0    0 02:39:37 Estab   18     18
-  192.168.12.2 4 65000           1971      3007    0    0 02:38:58 Estab   20     20
-  192.168.12.3 4 65000            196      4243    0    0 02:39:29 Estab   10     10
+  192.168.12.1 4 65000             63        74    0    0 00:46:59 Estab   7      7
+  192.168.12.2 4 65000            104       121    0    0 01:21:48 Estab   4      4
+  192.168.12.3 4 65000            114       106    0    0 01:20:30 Estab   4      4
 ```
-### SPINE-1-2:
+### SPINE-2-1:
 ```console
 sh bgp evp summary 
 BGP summary information for VRF default
-Router identifier 192.168.10.2, local AS number 65000
+Router identifier 192.168.20.1, local AS number 65002
 Neighbor Status Codes: m - Under maintenance
   Neighbor     V AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
-  192.168.12.1 4 65000           3033      2007    0    0 02:39:55 Estab   18     18
-  192.168.12.2 4 65000           1975      3004    0    0 02:39:17 Estab   20     20
-  192.168.12.3 4 65000            197      4226    0    0 02:39:52 Estab   10     10
+  192.168.22.2 4 65002             11        15    0    0 00:02:52 Estab   3      3
+  192.168.22.3 4 65002            109       116    0    0 01:22:21 Estab   8      8
 ```
 ### LEAF-1-1:
 ```console
+!
 sh vxlan address-table 
           Vxlan Mac Address Table
 ----------------------------------------------------------------------
 
 VLAN  Mac Address     Type      Prt  VTEP             Moves   Last Move
 ----  -----------     ----      ---  ----             -----   ---------
-  20  0050.7966.6807  EVPN      Vx1  192.168.13.2     1       2:14:18 ago
-  30  0050.7966.6808  EVPN      Vx1  192.168.13.2     1       2:08:21 ago
-4093  5000.0003.3766  EVPN      Vx1  192.168.13.2     1       0:44:53 ago
-4093  5000.0015.f4e8  EVPN      Vx1  192.168.13.3     1       1:57:00 ago
-4094  5000.0003.3766  EVPN      Vx1  192.168.13.2     1       0:48:16 ago
-Total Remote Mac Addresses for this criterion: 5
+  10  0050.7966.6807  EVPN      Vx1  192.168.13.3     1       0:04:01 ago
+  30  0050.7966.6808  EVPN      Vx1  192.168.13.2     1       0:48:41 ago
+4093  5000.0003.3766  EVPN      Vx1  192.168.13.2     1       0:48:42 ago
+4093  5000.0015.f4e8  EVPN      Vx1  192.168.13.3     1       0:04:02 ago
+Total Remote Mac Addresses for this criterion: 4
 !
-sh bgp evpn route-type ip-prefix ipv4
+sh bgp evpn
 BGP routing table information for VRF default
 Router identifier 192.168.12.1, local AS number 65000
 Route status codes: * - valid, > - active, S - Stale, E - ECMP head, e - ECMP
@@ -424,420 +464,343 @@ Origin codes: i - IGP, e - EGP, ? - incomplete
 AS Path Attributes: Or-ID - Originator ID, C-LST - Cluster List, LL Nexthop - Link Local Nexthop
 
           Network                Next Hop              Metric  LocPref Weight  Path
- * >      RD: 65000:1001 ip-prefix 0.0.0.0/0
-                                 -                     -       100     0       65500 ?
- * >      RD: 65000:1002 ip-prefix 0.0.0.0/0
-                                 -                     -       100     0       65500 ?
+ * >      RD: 65000:100010 mac-ip 0050.7966.6806
+                                 -                     -       -       0       i
+ * >      RD: 65000:100010 mac-ip 0050.7966.6807
+                                 192.168.13.3          -       100     0       65002 i Or-ID: 192.168.12.3 C-LST: 192.168.10.1 
+ * >      RD: 65000:100010 mac-ip 0050.7966.6807 10.0.0.12
+                                 192.168.13.3          -       100     0       65002 i Or-ID: 192.168.12.3 C-LST: 192.168.10.1 
+ * >      RD: 65000:1001 mac-ip 0050.7966.6808
+                                 192.168.13.2          -       100     0       i Or-ID: 192.168.12.2 C-LST: 192.168.10.1 
+ * >      RD: 65000:1001 mac-ip 0050.7966.6808 10.2.0.13
+                                 192.168.13.2          -       100     0       i Or-ID: 192.168.12.2 C-LST: 192.168.10.1 
+ * >      RD: 65000:100010 imet 192.168.13.1
+                                 -                     -       -       0       i
+ * >      RD: 65000:100020 imet 192.168.13.1
+                                 -                     -       -       0       i
+ * >      RD: 65000:200030 imet 192.168.13.1
+                                 -                     -       -       0       i
+ * >      RD: 65000:1001 imet 192.168.13.2
+                                 192.168.13.2          -       100     0       i Or-ID: 192.168.12.2 C-LST: 192.168.10.1 
+ * >      RD: 65000:100010 imet 192.168.13.3
+                                 192.168.13.3          -       100     0       i Or-ID: 192.168.12.3 C-LST: 192.168.10.1 
  * >      RD: 65000:1001 ip-prefix 10.0.0.0/24
                                  -                     -       -       0       i
- * >      RD: 65000:1002 ip-prefix 10.0.0.0/24
-                                 -                     -       100     0       65500 65500 i
  * >      RD: 65000:1001 ip-prefix 10.0.2.0/24
                                  -                     -       -       0       i
- * >      RD: 65000:1002 ip-prefix 10.0.2.0/24
-                                 -                     -       100     0       65500 65500 i
- * >      RD: 65000:1001 ip-prefix 10.0.255.0/29
-                                 -                     -       -       0       i
- * >      RD: 65000:1001 ip-prefix 10.2.0.0/24
-                                 -                     -       100     0       65500 65500 i
  * >      RD: 65000:1002 ip-prefix 10.2.0.0/24
                                  -                     -       -       0       i
- * >      RD: 65000:1001 ip-prefix 10.2.2.0/24
-                                 -                     -       100     0       65500 65500 i
- * >      RD: 65000:1002 ip-prefix 10.2.2.0/24
-                                 -                     -       -       0       i
- * >      RD: 65000:1002 ip-prefix 10.2.255.0/29
-                                 -                     -       -       0       i                       
+ * >      RD: 65002:1002 ip-prefix 10.2.2.0/24
+                                 192.168.13.3          -       100     0       65002 i Or-ID: 192.168.12.3 C-LST: 192.168.10.1                    
 !
 sh ip route vrf TENANT1
-VRF: TENANT1
-Gateway of last resort:
- B E      0.0.0.0/0 [20/0] via 10.0.255.3, Vlan901
 
  C        10.0.0.0/24 is directly connected, Vlan10
- B I      10.0.2.12/32 [200/0] via VTEP 192.168.13.2 VNI 1001 router-mac 50:00:00:03:37:66 local-interface Vxlan1
  C        10.0.2.0/24 is directly connected, Vlan20
- C        10.0.255.0/29 is directly connected, Vlan901
- B E      10.2.0.0/24 [20/0] via 10.0.255.3, Vlan901
- B E      10.2.2.0/24 [20/0] via 10.0.255.3, Vlan901
 !
 sh ip route vrf TENANT2
-VRF: TENANT2
-Gateway of last resort:
- B E      0.0.0.0/0 [20/0] via 10.2.255.3, Vlan902
 
- B E      10.0.0.0/24 [20/0] via 10.2.255.3, Vlan902
- B E      10.0.2.0/24 [20/0] via 10.2.255.3, Vlan902
  B I      10.2.0.13/32 [200/0] via VTEP 192.168.13.2 VNI 1002 router-mac 50:00:00:03:37:66 local-interface Vxlan1
  C        10.2.0.0/24 is directly connected, Vlan30
- B I      10.2.2.14/32 [200/0] via VTEP 192.168.13.3 VNI 1002 router-mac 50:00:00:15:f4:e8 local-interface Vxlan1
- C        10.2.2.0/24 is directly connected, Vlan40
- C        10.2.255.0/29 is directly connected, Vlan902
+ B I      10.2.2.0/24 [200/0] via VTEP 192.168.13.3 VNI 1002 router-mac 50:00:00:15:f4:e8 local-interface Vxlan1
 !
 ```
 ### LEAF-1-2:
 ```console
+!
 sh vxlan address-table 
           Vxlan Mac Address Table
 ----------------------------------------------------------------------
 
 VLAN  Mac Address     Type      Prt  VTEP             Moves   Last Move
 ----  -----------     ----      ---  ----             -----   ---------
-  10  0050.7966.6806  EVPN      Vx1  192.168.13.1     1       2:13:01 ago
-4093  5000.0015.f4e8  EVPN      Vx1  192.168.13.3     1       2:00:52 ago
-4093  5000.00d5.5dc0  EVPN      Vx1  192.168.13.1     1       2:24:50 ago
-4094  5000.00d5.5dc0  EVPN      Vx1  192.168.13.1     1       2:43:49 ago
-Total Remote Mac Addresses for this criterion: 4
+4093  5000.0015.f4e8  EVPN      Vx1  192.168.13.3     1       0:07:24 ago
+4093  5000.00d5.5dc0  EVPN      Vx1  192.168.13.1     1       0:52:08 ago
+4094  5000.00d5.5dc0  EVPN      Vx1  192.168.13.1     1       0:52:08 ago
+Total Remote Mac Addresses for this criterion: 3
 !
-sh bgp evpn route-type ip-prefix ipv4
-BGP routing table information for VRF default
-Router identifier 192.168.12.2, local AS number 65000
-Route status codes: * - valid, > - active, S - Stale, E - ECMP head, e - ECMP
-                    c - Contributing to ECMP, % - Pending BGP convergence
-Origin codes: i - IGP, e - EGP, ? - incomplete
-AS Path Attributes: Or-ID - Originator ID, C-LST - Cluster List, LL Nexthop - Link Local Nexthop
-
+sh bgp evpn
           Network                Next Hop              Metric  LocPref Weight  Path
- * >      RD: 65000:1001 ip-prefix 0.0.0.0/0
-                                 -                     -       100     0       65500 ?
- *  Ec    RD: 65000:1001 ip-prefix 0.0.0.0/0
-                                 192.168.13.1          -       100     0       65500 ? Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1001 ip-prefix 0.0.0.0/0
-                                 192.168.13.1          -       100     0       65500 ? Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >      RD: 65000:1002 ip-prefix 0.0.0.0/0
-                                 -                     -       100     0       65500 ?
- *  Ec    RD: 65000:1002 ip-prefix 0.0.0.0/0
-                                 192.168.13.1          -       100     0       65500 ? Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1002 ip-prefix 0.0.0.0/0
-                                 192.168.13.1          -       100     0       65500 ? Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65000:100010 mac-ip 0050.7966.6806
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65000:100010 mac-ip 0050.7966.6807
+                                 192.168.13.3          -       100     0       65002 i Or-ID: 192.168.12.3 C-LST: 192.168.10.1 
+ * >      RD: 65000:100010 mac-ip 0050.7966.6807 10.0.0.12
+                                 192.168.13.3          -       100     0       65002 i Or-ID: 192.168.12.3 C-LST: 192.168.10.1 
+ * >      RD: 65000:1001 mac-ip 0050.7966.6808
+                                 -                     -       -       0       i
+ * >      RD: 65000:1001 mac-ip 0050.7966.6808 10.2.0.13
+                                 -                     -       -       0       i
+ * >      RD: 65000:100010 imet 192.168.13.1
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65000:100020 imet 192.168.13.1
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65000:200030 imet 192.168.13.1
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65000:1001 imet 192.168.13.2
+                                 -                     -       -       0       i
+ * >      RD: 65000:100010 imet 192.168.13.3
+                                 192.168.13.3          -       100     0       i Or-ID: 192.168.12.3 C-LST: 192.168.10.1 
  * >      RD: 65000:1001 ip-prefix 10.0.0.0/24
-                                 -                     -       -       0       i
- *        RD: 65000:1001 ip-prefix 10.0.0.0/24
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *        RD: 65000:1001 ip-prefix 10.0.0.0/24
                                  192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >      RD: 65000:1002 ip-prefix 10.0.0.0/24
-                                 -                     -       100     0       65500 65500 i
- *  Ec    RD: 65000:1002 ip-prefix 10.0.0.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1002 ip-prefix 10.0.0.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
  * >      RD: 65000:1001 ip-prefix 10.0.2.0/24
-                                 -                     -       -       0       i
- *        RD: 65000:1001 ip-prefix 10.0.2.0/24
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *        RD: 65000:1001 ip-prefix 10.0.2.0/24
                                  192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >      RD: 65000:1002 ip-prefix 10.0.2.0/24
-                                 -                     -       100     0       65500 65500 i
- *  Ec    RD: 65000:1002 ip-prefix 10.0.2.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1002 ip-prefix 10.0.2.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >      RD: 65000:1001 ip-prefix 10.0.255.0/29
-                                 -                     -       -       0       i
- *        RD: 65000:1001 ip-prefix 10.0.255.0/29
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *        RD: 65000:1001 ip-prefix 10.0.255.0/29
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >      RD: 65000:1001 ip-prefix 10.2.0.0/24
-                                 -                     -       100     0       65500 65500 i
- *  Ec    RD: 65000:1001 ip-prefix 10.2.0.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1001 ip-prefix 10.2.0.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
  * >      RD: 65000:1002 ip-prefix 10.2.0.0/24
                                  -                     -       -       0       i
  *        RD: 65000:1002 ip-prefix 10.2.0.0/24
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *        RD: 65000:1002 ip-prefix 10.2.0.0/24
                                  192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >      RD: 65000:1001 ip-prefix 10.2.2.0/24
-                                 -                     -       100     0       65500 65500 i
- *  Ec    RD: 65000:1001 ip-prefix 10.2.2.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1001 ip-prefix 10.2.2.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >      RD: 65000:1002 ip-prefix 10.2.2.0/24
-                                 -                     -       -       0       i
- *        RD: 65000:1002 ip-prefix 10.2.2.0/24
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *        RD: 65000:1002 ip-prefix 10.2.2.0/24
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >      RD: 65000:1002 ip-prefix 10.2.255.0/29
-                                 -                     -       -       0       i
- *        RD: 65000:1002 ip-prefix 10.2.255.0/29
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *        RD: 65000:1002 ip-prefix 10.2.255.0/29
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65002:1002 ip-prefix 10.2.2.0/24
+                                 192.168.13.3          -       100     0       65002 i Or-ID: 192.168.12.3 C-LST: 192.168.10.1  
 !
 sh ip route vrf TENANT1
 VRF: TENANT1
-Gateway of last resort:
- B E      0.0.0.0/0 [20/0] via 10.0.255.3, Vlan901
+Gateway of last resort is not set
 
- B I      10.0.0.11/32 [200/0] via VTEP 192.168.13.1 VNI 1001 router-mac 50:00:00:d5:5d:c0 local-interface Vxlan1
- C        10.0.0.0/24 is directly connected, Vlan10
- C        10.0.2.0/24 is directly connected, Vlan20
- C        10.0.255.0/29 is directly connected, Vlan901
- B E      10.2.0.0/24 [20/0] via 10.0.255.3, Vlan901
- B E      10.2.2.0/24 [20/0] via 10.0.255.3, Vlan901
 !
 sh ip route vrf TENANT2
-VRF: TENANT2
-Gateway of last resort:
- B E      0.0.0.0/0 [20/0] via 10.2.255.3, Vlan902
-
- B E      10.0.0.0/24 [20/0] via 10.2.255.3, Vlan902
- B E      10.0.2.0/24 [20/0] via 10.2.255.3, Vlan902
  C        10.2.0.0/24 is directly connected, Vlan30
- B I      10.2.2.14/32 [200/0] via VTEP 192.168.13.3 VNI 1002 router-mac 50:00:00:15:f4:e8 local-interface Vxlan1
- C        10.2.2.0/24 is directly connected, Vlan40
- C        10.2.255.0/29 is directly connected, Vlan902
+ B I      10.2.2.0/24 [200/0] via VTEP 192.168.13.3 VNI 1002 router-mac 50:00:00:15:f4:e8 local-interface Vxlan1
 !
 ```
 ### LEAF-1-3:
 ```console
+!
 sh vxlan address-table 
           Vxlan Mac Address Table
 ----------------------------------------------------------------------
 
 VLAN  Mac Address     Type      Prt  VTEP             Moves   Last Move
 ----  -----------     ----      ---  ----             -----   ---------
-  10  0050.7966.6806  EVPN      Vx1  192.168.13.1     1       1:00:50 ago
-  20  0050.7966.6807  EVPN      Vx1  192.168.13.2     1       2:22:44 ago
-  30  0050.7966.6808  EVPN      Vx1  192.168.13.2     1       2:07:59 ago
-4093  5000.0003.3766  EVPN      Vx1  192.168.13.2     1       0:53:19 ago
-4093  5000.00d5.5dc0  EVPN      Vx1  192.168.13.1     1       2:29:25 ago
-4094  5000.0003.3766  EVPN      Vx1  192.168.13.2     1       0:56:38 ago
-4094  5000.00d5.5dc0  EVPN      Vx1  192.168.13.1     1       2:48:48 ago
-Total Remote Mac Addresses for this criterion: 7
+  10  0050.7966.6806  EVPN      Vx1  192.168.13.1     1       0:51:57 ago
+  10  0050.7966.6807  EVPN      Vx1  192.168.23.2     1       0:10:38 ago
+4093  5000.0003.3766  EVPN      Vx1  192.168.13.2     1       1:28:53 ago
+4093  5000.00ba.c6f8  EVPN      Vx1  192.168.23.2     1       0:10:38 ago
+4093  5000.00d5.5dc0  EVPN      Vx1  192.168.13.1     1       0:55:20 ago
+4094  5000.00d5.5dc0  EVPN      Vx1  192.168.13.1     1       0:55:20 ago
+Total Remote Mac Addresses for this criterion: 6
 !
-sh bgp evpn route-type ip-prefix ipv4
-BGP routing table information for VRF default
-Router identifier 192.168.12.3, local AS number 65000
-Route status codes: * - valid, > - active, S - Stale, E - ECMP head, e - ECMP
-                    c - Contributing to ECMP, % - Pending BGP convergence
-Origin codes: i - IGP, e - EGP, ? - incomplete
-AS Path Attributes: Or-ID - Originator ID, C-LST - Cluster List, LL Nexthop - Link Local Nexthop
-
+sh bgp evpn
           Network                Next Hop              Metric  LocPref Weight  Path
- * >Ec    RD: 65000:1001 ip-prefix 0.0.0.0/0
-                                 192.168.13.1          -       100     0       65500 ? Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1001 ip-prefix 0.0.0.0/0
-                                 192.168.13.1          -       100     0       65500 ? Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >Ec    RD: 65000:1002 ip-prefix 0.0.0.0/0
-                                 192.168.13.1          -       100     0       65500 ? Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1002 ip-prefix 0.0.0.0/0
-                                 192.168.13.1          -       100     0       65500 ? Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65000:100010 mac-ip 0050.7966.6806
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65000:100010 mac-ip 0050.7966.6807
+                                 -                     -       100     0       65002 i
+ * >      RD: 65000:100010 mac-ip 0050.7966.6807 10.0.0.12
+                                 -                     -       100     0       65002 i
+ * >      RD: 65000:1001 mac-ip 0050.7966.6808
+                                 192.168.13.2          -       100     0       i Or-ID: 192.168.12.2 C-LST: 192.168.10.1 
+ * >      RD: 65000:1001 mac-ip 0050.7966.6808 10.2.0.13
+                                 192.168.13.2          -       100     0       i Or-ID: 192.168.12.2 C-LST: 192.168.10.1 
+ * >      RD: 65500:10010 mac-ip 0050.7966.6806 remote
+                                 -                     -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65500:100010 mac-ip 0050.7966.6807 remote
+                                 192.168.23.2          -       100     0       65002 i
+ * >      RD: 65500:100010 mac-ip 0050.7966.6807 10.0.0.12 remote
+                                 192.168.23.2          -       100     0       65002 i
+ * >      RD: 65000:100010 imet 192.168.13.1
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65000:100020 imet 192.168.13.1
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65000:200030 imet 192.168.13.1
+                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
+ * >      RD: 65000:1001 imet 192.168.13.2
+                                 192.168.13.2          -       100     0       i Or-ID: 192.168.12.2 C-LST: 192.168.10.1 
+ * >      RD: 65000:100010 imet 192.168.13.3
+                                 -                     -       -       0       i
+ * >      RD: 65500:10010 imet 192.168.13.3 remote
+                                 -                     -       -       0       i
+ * >      RD: 65500:100010 imet 192.168.23.2 remote
+                                 192.168.23.2          -       100     0       65002 i
  * >      RD: 65000:1001 ip-prefix 10.0.0.0/24
-                                 -                     -       -       0       i
- *        RD: 65000:1001 ip-prefix 10.0.0.0/24
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *        RD: 65000:1001 ip-prefix 10.0.0.0/24
                                  192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >Ec    RD: 65000:1002 ip-prefix 10.0.0.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1002 ip-prefix 10.0.0.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
  * >      RD: 65000:1001 ip-prefix 10.0.2.0/24
-                                 -                     -       -       0       i
- *        RD: 65000:1001 ip-prefix 10.0.2.0/24
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *        RD: 65000:1001 ip-prefix 10.0.2.0/24
                                  192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >Ec    RD: 65000:1002 ip-prefix 10.0.2.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1002 ip-prefix 10.0.2.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >Ec    RD: 65000:1001 ip-prefix 10.0.255.0/29
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- *  ec    RD: 65000:1001 ip-prefix 10.0.255.0/29
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- * >Ec    RD: 65000:1001 ip-prefix 10.2.0.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1001 ip-prefix 10.2.0.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
  * >      RD: 65000:1002 ip-prefix 10.2.0.0/24
-                                 -                     -       -       0       i
-*        RD: 65000:1002 ip-prefix 10.2.0.0/24
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *        RD: 65000:1002 ip-prefix 10.2.0.0/24
                                  192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >Ec    RD: 65000:1001 ip-prefix 10.2.2.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *  ec    RD: 65000:1001 ip-prefix 10.2.2.0/24
-                                 192.168.13.1          -       100     0       65500 65500 i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >      RD: 65000:1002 ip-prefix 10.2.2.0/24
-                                 -                     -       -       0       i
- *        RD: 65000:1002 ip-prefix 10.2.2.0/24
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
- *        RD: 65000:1002 ip-prefix 10.2.2.0/24
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- * >Ec    RD: 65000:1002 ip-prefix 10.2.255.0/29
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.1 
- *  ec    RD: 65000:1002 ip-prefix 10.2.255.0/29
-                                 192.168.13.1          -       100     0       i Or-ID: 192.168.12.1 C-LST: 192.168.10.2 
+ * >      RD: 65002:1002 ip-prefix 10.2.2.0/24
+                                 192.168.23.2          -       100     0       65002 i
+ * >      RD: 65000:1002 ip-prefix 10.2.0.0/24 remote
+                                 192.168.13.1          -       100     0       i
+ * >      RD: 65002:1002 ip-prefix 10.2.2.0/24 remote
+                                 192.168.23.2          -       100     0       65002 i
 !
 sh ip route vrf TENANT1
-VRF: TENANT1
-Gateway of last resort:
- B I      0.0.0.0/0 [200/0] via VTEP 192.168.13.1 VNI 1001 router-mac 50:00:00:d5:5d:c0 local-interface Vxlan1
-
- B I      10.0.0.11/32 [200/0] via VTEP 192.168.13.1 VNI 1001 router-mac 50:00:00:d5:5d:c0 local-interface Vxlan1
- C        10.0.0.0/24 is directly connected, Vlan10
- B I      10.0.2.12/32 [200/0] via VTEP 192.168.13.2 VNI 1001 router-mac 50:00:00:03:37:66 local-interface Vxlan1
- C        10.0.2.0/24 is directly connected, Vlan20
- B I      10.0.255.0/29 [200/0] via VTEP 192.168.13.1 VNI 1001 router-mac 50:00:00:d5:5d:c0 local-interface Vxlan1
- B I      10.2.0.0/24 [200/0] via VTEP 192.168.13.1 VNI 1001 router-mac 50:00:00:d5:5d:c0 local-interface Vxlan1
- B I      10.2.2.0/24 [200/0] via VTEP 192.168.13.1 VNI 1001 router-mac 50:00:00:d5:5d:c0 local-interface Vxlan1
-!
-sh ip route vrf TENANT2
-VRF: TENANT2
-Gateway of last resort:
- B I      0.0.0.0/0 [200/0] via VTEP 192.168.13.1 VNI 1002 router-mac 50:00:00:d5:5d:c0 local-interface Vxlan1
-
- B I      10.0.0.0/24 [200/0] via VTEP 192.168.13.1 VNI 1002 router-mac 50:00:00:d5:5d:c0 local-interface Vxlan1
- B I      10.0.2.0/24 [200/0] via VTEP 192.168.13.1 VNI 1002 router-mac 50:00:00:d5:5d:c0 local-interface Vxlan1
- B I      10.2.0.13/32 [200/0] via VTEP 192.168.13.2 VNI 1002 router-mac 50:00:00:03:37:66 local-interface Vxlan1
- C        10.2.0.0/24 is directly connected, Vlan30
- C        10.2.2.0/24 is directly connected, Vlan40
- B I      10.2.255.0/29 [200/0] via VTEP 192.168.13.1 VNI 1002 router-mac 50:00:00:d5:5d:c0 local-interface Vxlan1
-!
-```
-### FW01:
-```console
-!
-sh ip bgp summary 
-BGP summary information for VRF default
-Router identifier 91.201.200.2, local AS number 65500
-Neighbor Status Codes: m - Under maintenance
-  Neighbor         V  AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc
-  10.0.255.1       4  65000            389      1090    0    0 00:39:48 Estab   2      2
-  10.0.255.2       4  65000           1332       419    0    0 00:39:48 Estab   2      2
-  10.2.255.1       4  65000            553      1149    0    0 00:39:47 Estab   2      2
-  10.2.255.2       4  65000           1134      1266    0    0 00:39:47 Estab   2      2
-  91.201.200.1     4  10                97      1294    0    0 00:39:45 Estab   1      1
-!
-sh ip route
-VRF: default
 Gateway of last resort is not set
 
- B E      8.8.8.8/32 [200/0] via 91.201.200.1, Ethernet3
- B E      10.0.0.0/24 [200/0] via 10.0.255.1, Vlan901
- B E      10.0.2.0/24 [200/0] via 10.0.255.1, Vlan901
- C        10.0.255.0/29 is directly connected, Vlan901
- B E      10.2.0.0/24 [200/0] via 10.2.255.1, Vlan902
- B E      10.2.2.0/24 [200/0] via 10.2.255.1, Vlan902
- C        10.2.255.0/29 is directly connected, Vlan902
- C        91.201.200.0/24 is directly connected, Ethernet3
+!
+sh ip route vrf TENANT2
+Gateway of last resort is not set
+
+ B I      10.2.0.13/32 [200/0] via VTEP 192.168.13.2 VNI 1002 router-mac 50:00:00:03:37:66 local-interface Vxlan1
+ B I      10.2.0.0/24 [200/0] via VTEP 192.168.13.1 VNI 1002 router-mac 50:00:00:d5:5d:c0 local-interface Vxlan1
+ B E      10.2.2.0/24 [20/0] via VTEP 192.168.23.2 VNI 1002 router-mac 50:00:00:ba:c6:f8 local-interface Vxlan1
 !
 ```
+
+### LEAF-2-2:
+```console
+!
+show vxlan address-table
+          Vxlan Mac Address Table
+----------------------------------------------------------------------
+
+VLAN  Mac Address     Type      Prt  VTEP             Moves   Last Move
+----  -----------     ----      ---  ----             -----   ---------
+  10  0050.7966.6806  EVPN      Vx1  192.168.13.3     1       0:55:42 ago
+  10  0050.7966.6807  EVPN      Vx1  192.168.23.3     1       0:14:24 ago
+4093  5000.00d8.ac19  EVPN      Vx1  192.168.23.3     1       0:14:25 ago
+4094  5000.0015.f4e8  EVPN      Vx1  192.168.13.3     1       1:16:14 ago
+4094  5000.00d8.ac19  EVPN      Vx1  192.168.23.3     1       0:14:25 ago
+Total Remote Mac Addresses for this criterion: 5
+!
+sh bgp evpn
+          Network                Next Hop              Metric  LocPref Weight  Path
+ * >      RD: 65002:100010 mac-ip 0050.7966.6806
+                                 -                     -       100     0       65000 i
+ * >      RD: 65002:100010 mac-ip 0050.7966.6807
+                                 192.168.23.3          -       100     0       i Or-ID: 192.168.22.3 C-LST: 192.168.20.1 
+ * >      RD: 65002:100010 mac-ip 0050.7966.6807 10.0.0.12
+                                 192.168.23.3          -       100     0       i Or-ID: 192.168.22.3 C-LST: 192.168.20.1 
+ * >      RD: 65002:200040 mac-ip 0050.7966.6809
+                                 192.168.23.3          -       100     0       i Or-ID: 192.168.22.3 C-LST: 192.168.20.1 
+ * >      RD: 65002:200040 mac-ip 0050.7966.6809 10.2.2.14
+                                 192.168.23.3          -       100     0       i Or-ID: 192.168.22.3 C-LST: 192.168.20.1 
+ * >      RD: 65500:10010 mac-ip 0050.7966.6806 remote
+                                 192.168.13.3          -       100     0       65000 i
+ * >      RD: 65500:100010 mac-ip 0050.7966.6807 remote
+                                 -                     -       100     0       i Or-ID: 192.168.22.3 C-LST: 192.168.20.1 
+ * >      RD: 65500:100010 mac-ip 0050.7966.6807 10.0.0.12 remote
+                                 -                     -       100     0       i Or-ID: 192.168.22.3 C-LST: 192.168.20.1 
+ * >      RD: 65002:100010 imet 192.168.23.2
+                                 -                     -       -       0       i
+ * >      RD: 65002:100010 imet 192.168.23.3
+                                 192.168.23.3          -       100     0       i Or-ID: 192.168.22.3 C-LST: 192.168.20.1 
+ * >      RD: 65002:200040 imet 192.168.23.3
+                                 192.168.23.3          -       100     0       i Or-ID: 192.168.22.3 C-LST: 192.168.20.1 
+ * >      RD: 65500:10010 imet 192.168.13.3 remote
+                                 192.168.13.3          -       100     0       65000 i
+ * >      RD: 65500:100010 imet 192.168.23.2 remote
+                                 -                     -       -       0       i
+ * >      RD: 65002:1001 ip-prefix 10.0.0.0/24
+                                 192.168.23.3          -       100     0       i Or-ID: 192.168.22.3 C-LST: 192.168.20.1 
+ * >      RD: 65000:1002 ip-prefix 10.2.0.0/24
+                                 192.168.13.3          -       100     0       65000 i
+ * >      RD: 65002:1002 ip-prefix 10.2.2.0/24
+                                 192.168.23.3          -       100     0       i Or-ID: 192.168.22.3 C-LST: 192.168.20.1 
+ * >      RD: 65000:1002 ip-prefix 10.2.0.0/24 remote
+                                 192.168.13.3          -       100     0       65000 i
+ * >      RD: 65002:1002 ip-prefix 10.2.2.0/24 remote
+                                 192.168.23.3          -       100     0       i
+
+!
+sh ip route vrf TENANT1
+Gateway of last resort is not set
+
+!
+sh ip route vrf TENANT2
+Gateway of last resort is not set
+
+ B E      10.2.0.0/24 [20/0] via VTEP 192.168.13.3 VNI 1002 router-mac 50:00:00:15:f4:e8 local-interface Vxlan1
+ B I      10.2.2.14/32 [200/0] via VTEP 192.168.23.3 VNI 1002 router-mac 50:00:00:d8:ac:19 local-interface Vxlan1
+ B I      10.2.2.0/24 [200/0] via VTEP 192.168.23.3 VNI 1002 router-mac 50:00:00:d8:ac:19 local-interface Vxlan1
+!
+```
+
+### LEAF-2-3:
+```console
+!
+show vxlan address-table
+----------------------------------------------------------------------
+
+VLAN  Mac Address     Type      Prt  VTEP             Moves   Last Move
+----  -----------     ----      ---  ----             -----   ---------
+  10  0050.7966.6806  EVPN      Vx1  192.168.23.2     1       0:17:23 ago
+4094  5000.00ba.c6f8  EVPN      Vx1  192.168.23.2     1       0:17:23 ago
+Total Remote Mac Addresses for this criterion: 2
+!
+sh bgp evpn
+          Network                Next Hop              Metric  LocPref Weight  Path
+ * >      RD: 65002:100010 mac-ip 0050.7966.6806
+                                 192.168.23.2          -       100     0       65000 i Or-ID: 192.168.22.2 C-LST: 192.168.20.1 
+ * >      RD: 65002:100010 mac-ip 0050.7966.6807
+                                 -                     -       -       0       i
+ * >      RD: 65002:100010 mac-ip 0050.7966.6807 10.0.0.12
+                                 -                     -       -       0       i
+ * >      RD: 65002:200040 mac-ip 0050.7966.6809
+                                 -                     -       -       0       i
+ * >      RD: 65002:200040 mac-ip 0050.7966.6809 10.2.2.14
+                                 -                     -       -       0       i
+ * >      RD: 65002:100010 imet 192.168.23.2
+                                 192.168.23.2          -       100     0       i Or-ID: 192.168.22.2 C-LST: 192.168.20.1 
+ * >      RD: 65002:100010 imet 192.168.23.3
+                                 -                     -       -       0       i
+ * >      RD: 65002:200040 imet 192.168.23.3
+                                 -                     -       -       0       i
+ * >      RD: 65002:1001 ip-prefix 10.0.0.0/24
+                                 -                     -       -       0       i
+ * >      RD: 65000:1002 ip-prefix 10.2.0.0/24
+                                 192.168.23.2          -       100     0       65000 i Or-ID: 192.168.22.2 C-LST: 192.168.20.1 
+ * >      RD: 65002:1002 ip-prefix 10.2.2.0/24
+                                 -                     -       -       0       i
+
+!
+sh ip route vrf TENANT1
+Gateway of last resort is not set
+
+ C        10.0.0.0/24 is directly connected, Vlan10
+
+!
+sh ip route vrf TENANT2
+Gateway of last resort is not set
+
+ B I      10.2.0.0/24 [200/0] via VTEP 192.168.23.2 VNI 1002 router-mac 50:00:00:ba:c6:f8 local-interface Vxlan1
+ C        10.2.2.0/24 is directly connected, Vlan40
+!
+```
+
 ### VPC1:
 ```console
-VPC-1> ping 10.2.0.13   
+VPC-1> ping 10.0.0.12
 
-84 bytes from 10.2.0.13 icmp_seq=1 ttl=61 time=68.013 ms
-84 bytes from 10.2.0.13 icmp_seq=2 ttl=61 time=56.007 ms
-84 bytes from 10.2.0.13 icmp_seq=3 ttl=61 time=61.127 ms
-84 bytes from 10.2.0.13 icmp_seq=4 ttl=61 time=106.785 ms
-84 bytes from 10.2.0.13 icmp_seq=5 ttl=61 time=55.017 ms
-
-VPC-1> ping 10.2.2.14
-
-84 bytes from 10.2.2.14 icmp_seq=1 ttl=60 time=83.123 ms
-84 bytes from 10.2.2.14 icmp_seq=2 ttl=60 time=66.661 ms
-84 bytes from 10.2.2.14 icmp_seq=3 ttl=60 time=84.275 ms
-84 bytes from 10.2.2.14 icmp_seq=4 ttl=60 time=74.342 ms
-84 bytes from 10.2.2.14 icmp_seq=5 ttl=60 time=94.071 ms
-
-VPC-1> ping 8.8.8.8
-
-84 bytes from 8.8.8.8 icmp_seq=1 ttl=62 time=36.870 ms
-84 bytes from 8.8.8.8 icmp_seq=2 ttl=62 time=41.248 ms
-84 bytes from 8.8.8.8 icmp_seq=3 ttl=62 time=32.755 ms
-84 bytes from 8.8.8.8 icmp_seq=4 ttl=62 time=34.162 ms
-84 bytes from 8.8.8.8 icmp_seq=5 ttl=62 time=43.792 ms
+84 bytes from 10.0.0.12 icmp_seq=1 ttl=64 time=432.644 ms
+84 bytes from 10.0.0.12 icmp_seq=2 ttl=64 time=171.053 ms
+84 bytes from 10.0.0.12 icmp_seq=3 ttl=64 time=152.134 ms
+84 bytes from 10.0.0.12 icmp_seq=4 ttl=64 time=132.663 ms
+84 bytes from 10.0.0.12 icmp_seq=5 ttl=64 time=326.002 ms
 
 ```
 
 ### VPC2:
 ```console
-VPC-2> ping 10.2.0.13
+VPC-2> ping 10.0.0.11
 
-84 bytes from 10.2.0.13 icmp_seq=1 ttl=60 time=118.229 ms
-84 bytes from 10.2.0.13 icmp_seq=2 ttl=60 time=79.363 ms
-84 bytes from 10.2.0.13 icmp_seq=3 ttl=60 time=120.570 ms
-84 bytes from 10.2.0.13 icmp_seq=4 ttl=60 time=84.928 ms
-84 bytes from 10.2.0.13 icmp_seq=5 ttl=60 time=77.286 ms
-
-VPC-2> ping 10.2.2.14
-
-84 bytes from 10.2.2.14 icmp_seq=1 ttl=59 time=245.467 ms
-84 bytes from 10.2.2.14 icmp_seq=2 ttl=59 time=103.980 ms
-84 bytes from 10.2.2.14 icmp_seq=3 ttl=59 time=101.037 ms
-84 bytes from 10.2.2.14 icmp_seq=4 ttl=59 time=97.699 ms
-84 bytes from 10.2.2.14 icmp_seq=5 ttl=59 time=92.077 ms
-
-VPC-2> ping 8.8.8.8
-
-84 bytes from 8.8.8.8 icmp_seq=1 ttl=61 time=72.143 ms
-84 bytes from 8.8.8.8 icmp_seq=2 ttl=61 time=70.893 ms
-84 bytes from 8.8.8.8 icmp_seq=3 ttl=61 time=52.804 ms
-84 bytes from 8.8.8.8 icmp_seq=4 ttl=61 time=57.568 ms
-84 bytes from 8.8.8.8 icmp_seq=5 ttl=61 time=59.686 ms
+84 bytes from 10.0.0.11 icmp_seq=1 ttl=64 time=170.550 ms
+84 bytes from 10.0.0.11 icmp_seq=2 ttl=64 time=128.551 ms
+84 bytes from 10.0.0.11 icmp_seq=3 ttl=64 time=198.727 ms
+84 bytes from 10.0.0.11 icmp_seq=4 ttl=64 time=297.980 ms
+84 bytes from 10.0.0.11 icmp_seq=5 ttl=64 time=173.316 ms
 
 ```
 
 ### VPC3:
 ```console
-VPC-3> ping 10.0.0.11
+VPC-3> ping 10.2.2.14
 
-84 bytes from 10.0.0.11 icmp_seq=1 ttl=60 time=93.078 ms
-84 bytes from 10.0.0.11 icmp_seq=2 ttl=60 time=121.783 ms
-84 bytes from 10.0.0.11 icmp_seq=3 ttl=60 time=144.184 ms
-84 bytes from 10.0.0.11 icmp_seq=4 ttl=60 time=75.881 ms
-84 bytes from 10.0.0.11 icmp_seq=5 ttl=60 time=73.637 ms
+84 bytes from 10.2.2.14 icmp_seq=1 ttl=60 time=117.374 ms
+84 bytes from 10.2.2.14 icmp_seq=2 ttl=60 time=190.646 ms
+84 bytes from 10.2.2.14 icmp_seq=3 ttl=60 time=148.799 ms
+84 bytes from 10.2.2.14 icmp_seq=4 ttl=60 time=155.076 ms
+84 bytes from 10.2.2.14 icmp_seq=5 ttl=60 time=185.470 ms
 
-VPC-3> ping 10.0.2.12
-
-84 bytes from 10.0.2.12 icmp_seq=1 ttl=60 time=84.773 ms
-84 bytes from 10.0.2.12 icmp_seq=2 ttl=60 time=80.445 ms
-84 bytes from 10.0.2.12 icmp_seq=3 ttl=60 time=67.124 ms
-84 bytes from 10.0.2.12 icmp_seq=4 ttl=60 time=75.802 ms
-84 bytes from 10.0.2.12 icmp_seq=5 ttl=60 time=105.158 ms
-
-VPC-3> ping 8.8.8.8  
-
-84 bytes from 8.8.8.8 icmp_seq=1 ttl=61 time=52.117 ms
-84 bytes from 8.8.8.8 icmp_seq=2 ttl=61 time=51.368 ms
-84 bytes from 8.8.8.8 icmp_seq=3 ttl=61 time=47.047 ms
-84 bytes from 8.8.8.8 icmp_seq=4 ttl=61 time=42.463 ms
-84 bytes from 8.8.8.8 icmp_seq=5 ttl=61 time=40.725 ms
 ```
 ### VPC4:
 ```console
-VPC-4> ping 10.0.0.11   
+VPC-4> ping 10.2.0.13   
 
-84 bytes from 10.0.0.11 icmp_seq=1 ttl=60 time=59.551 ms
-84 bytes from 10.0.0.11 icmp_seq=2 ttl=60 time=87.038 ms
-84 bytes from 10.0.0.11 icmp_seq=3 ttl=60 time=71.632 ms
-84 bytes from 10.0.0.11 icmp_seq=4 ttl=60 time=76.914 ms
-84 bytes from 10.0.0.11 icmp_seq=5 ttl=60 time=79.021 ms
+84 bytes from 10.2.0.13 icmp_seq=1 ttl=60 time=181.694 ms
+84 bytes from 10.2.0.13 icmp_seq=2 ttl=60 time=208.278 ms
+84 bytes from 10.2.0.13 icmp_seq=3 ttl=60 time=160.420 ms
+84 bytes from 10.2.0.13 icmp_seq=4 ttl=60 time=153.657 ms
+84 bytes from 10.2.0.13 icmp_seq=5 ttl=60 time=120.134 ms
 
-VPC-4> ping 10.0.2.12
-
-84 bytes from 10.0.2.12 icmp_seq=1 ttl=60 time=82.262 ms
-84 bytes from 10.0.2.12 icmp_seq=2 ttl=60 time=98.333 ms
-84 bytes from 10.0.2.12 icmp_seq=3 ttl=60 time=106.178 ms
-84 bytes from 10.0.2.12 icmp_seq=4 ttl=60 time=87.766 ms
-84 bytes from 10.0.2.12 icmp_seq=5 ttl=60 time=77.867 ms
-
-VPC-4> ping 8.8.8.8
-
-84 bytes from 8.8.8.8 icmp_seq=1 ttl=61 time=53.309 ms
-84 bytes from 8.8.8.8 icmp_seq=2 ttl=61 time=50.512 ms
-84 bytes from 8.8.8.8 icmp_seq=3 ttl=61 time=116.294 ms
-84 bytes from 8.8.8.8 icmp_seq=4 ttl=61 time=71.681 ms
-84 bytes from 8.8.8.8 icmp_seq=5 ttl=61 time=48.784 ms
 ```

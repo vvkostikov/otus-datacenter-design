@@ -1,0 +1,60 @@
+!
+service routing protocols model multi-agent
+!
+hostname SPINE-2-2
+!
+interface Ethernet1
+   description LEAF-2-1 Eth2
+   no switchport
+   ip address 192.168.24.2/31
+   bfd interval 700 min-rx 500 multiplier 3
+!
+interface Ethernet2
+   description LEAF-2-2 Eth2
+   no switchport
+   ip address 192.168.24.6/31
+   bfd interval 700 min-rx 500 multiplier 3
+!
+interface Ethernet3
+   description LEAF-2-3 Eth2
+   no switchport
+   ip address 192.168.24.10/31
+   bfd interval 700 min-rx 500 multiplier 3
+!
+interface Ethernet4
+   description LEAF-2-4 Eth2
+   no switchport
+   ip address 192.168.24.14/31
+   bfd interval 700 min-rx 500 multiplier 3
+!
+interface Loopback1
+   ip address 192.168.20.2/32
+!
+ip routing
+!
+router bgp 65002
+   router-id 192.168.20.2
+   no bgp default ipv4-unicast
+   distance bgp 20 200 200
+   bgp listen range 192.168.24.0/24 peer-group LEAFS remote-as 65002
+   bgp listen range 192.168.22.0/24 peer-group OVERLAY remote-as 65002
+   neighbor LEAFS peer group
+   neighbor LEAFS remote-as 65002
+   neighbor LEAFS next-hop-self
+   neighbor LEAFS rib-in pre-policy retain all
+   neighbor LEAFS route-reflector-client
+   neighbor LEAFS password 7 7atGipPawR6iRnCUhuFEmQ==
+   neighbor LEAFS send-community standard extended
+   neighbor OVERLAY peer group
+   neighbor OVERLAY update-source Loopback1
+   neighbor OVERLAY route-reflector-client
+   neighbor OVERLAY password 7 DlWK0cwY1Ff6tIPt5ZfWxQ==
+   neighbor OVERLAY send-community extended
+   !
+   address-family evpn
+      neighbor OVERLAY activate
+   !
+   address-family ipv4
+      neighbor LEAFS activate
+      network 192.168.20.2/32
+!

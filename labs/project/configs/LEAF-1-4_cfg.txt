@@ -62,8 +62,6 @@ router bgp 65000
    maximum-paths 4 ecmp 4
    neighbor BGW peer group
    neighbor BGW remote-as 65002
-   no neighbor BGW next-hop-unchanged
-   no neighbor BGW allowas-in
    neighbor BGW password 7 UnLeOpjU4lF2fjEImIsVpw==
    neighbor BGW send-community extended
    neighbor OVERLAY peer group
