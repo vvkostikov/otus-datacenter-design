@@ -67,23 +67,32 @@ RD - 65002:100010
 
 RT - 65002:100010
 
-## Описание взаимодействия VRF и правил суммаризации:
+## Описание выбора виртуального MAC:
 
-По требованиям "IT Security" взаимодействие между сервисами подразделений должно происходить через внешний Фаервол.
+Чтобы избежать влияние смены MAC адреса шлюза при перемещении Любого устройства в сети, для всех LEAF с Anycast-gateway прописано использовать виртуальный MAC адрес.
 
-Каждому подразделению выдана 1 своя большая сеть:
+Он взят с LEAF-1-1:
+ip virtual-router mac-address c001.cafe.babe
 
-Tenant1 - 10.0.0.0/16
+## Описание DCI:
 
-Tenant2 - 10.2.0.0/16
+### Описание выбора BGW и схемы подключения:
 
-Граничный LEAF взаимодействует с внешним Фаерволом по протоколу BGP в каждой VRF. Настроены Route-map для контроля проходящих маршрутов.
+Для целей связи между Датацентрами выбраны LEAF-1-3 и LEAF-1-4 в Датацентре 1 и LEAF-2-1 с LEAF-2-2 в Датацентре 2. Фактически они я являются Border Gateway Leaf. (BGW)
 
-Разрешена передача сетей /24 относящихся к VRF и default. /32 запрещены.
+Связь обеспечивается прямыми линками между указанными коммутаторами попарно:
+LEAF-1-3 - LEAF-2-2
+LEAF-1-4 - LEAF-2-1
+
+### Описание выбора адресации для связи между Датацентрами:
+
+Решено использовать уникальную сеть 172.30.254.0/24 поделенную на /31 подсети.
+
+Оставлен резерв для дальнейшего увеличения количества линков при возрастании тербований к отказоустойчивости или пропускной способности.
 
 ## Схема сети:
 
-![alt text](Net_Scheme_Lab8.png)
+![alt text](Net_Scheme_Project.png)
 
 ## Таблица адресов:
 | Подсеть ipv4 | Device/Port|    Описание   |
@@ -140,6 +149,10 @@ Tenant2 - 10.2.0.0/16
 | 192.168.24.13/31  |  Leaf-2-4 Eth1 |     P2P Spine 2-1 to Leaf 2-4    |
 | 192.168.24.14/31  |  Spine-2-2 Eth4 |     P2P Spine 2-2 to Leaf 2-4    |
 | 192.168.24.15/31  |  Leaf-2-4 Eth2 |     P2P Spine 2-2 to Leaf 2-4    |
+| 172.30.254.0/31  |  Leaf-1-4 Eth3 |     DCI P2P Leaf-1-4 to Leaf 2-1    |
+| 172.30.254.1/31  |  Leaf-2-1 Eth3 |     DCI P2P Leaf-1-4 to Leaf 2-1    |
+| 172.30.254.2/31  |  Leaf-1-3 Eth3 |     DCI P2P Leaf-1-3 to Leaf 2-2    |
+| 172.30.254.3/31  |  Leaf-2-2 Eth3 |     DCI P2P Leaf-1-3 to Leaf 2-2    |
 
 ## Настройки коммутаторов:
 Использованы шаблоны для ускорения настройки:
@@ -149,6 +162,8 @@ SPINE - Underlay BGP на LEAF в сторону SPINE.
 LEAFS - Underlay BGP на SPINE в торону LEAF.
 
 OVERLAY - на LEAF и SPINE для настройки EVPN.
+
+BGW - На Border LEAF в сторону LEAF соседнего DC для настройки EVPN.
 
 Для упрощения настройки SPINE использованы комманды bgp listen range. 
 Что позволяет уйти от ручного указания IP всех соседствующих LEAF.
@@ -231,6 +246,23 @@ router bgp 65XXXX
       neighbor OVERLAY activate
 
 ```
+### Типовая конфигурация процесса BGP Leaf BGW:
+```console
+service routing protocols model multi-agent
+
+router bgp 65XXXX
+   neighbor BGW peer group
+   neighbor BGW remote-as 65XXXX
+   neighbor BGW password 123test
+   neighbor BGW send-community extended
+
+   neighbor <BGW PtP IP> peer group BGW
+
+   address-family evpn
+      neighbor BGW activate
+      neighbor BGW domain remote
+
+```
 ### Типовая конфигурация процесса BGP Leaf VXLAN:
 ```console
 interface Vxlan1
@@ -308,695 +340,6 @@ vrf <TENANT1>
 #### Датацентр1:
 #### Датацентр2:
 ![SPINE-2-1](/labs/project/configs/SPINE2-1_cfg.txt)
-
-```
-### SPINE-1-2:
-```console
-!
-service routing protocols model multi-agent
-!
-hostname SPINE-1-2
-!
-spanning-tree mode mstp
-!
-interface Ethernet1
-   description LEAF-1-1 Eth2
-   no switchport
-   ip address 192.168.14.6/31
-   bfd interval 700 min-rx 500 multiplier 3
-!
-interface Ethernet2
-   description LEAF-1-2 Eth2
-   no switchport
-   ip address 192.168.14.8/31
-   bfd interval 700 min-rx 500 multiplier 3
-!
-interface Ethernet3
-   description LEAF-1-3 Eth2
-   no switchport
-   ip address 192.168.14.10/31
-   bfd interval 700 min-rx 500 multiplier 3
-!
-interface Loopback1
-   ip address 192.168.10.2/32
-!
-ip routing
-!
-router bgp 65000
-   router-id 192.168.10.2
-   no bgp default ipv4-unicast
-   distance bgp 20 200 200
-   bgp listen range 192.168.14.0/24 peer-group LEAFS remote-as 65000
-   bgp listen range 192.168.12.0/24 peer-group OVERLAY remote-as 65000
-   neighbor LEAFS peer group
-   neighbor LEAFS remote-as 65000
-   neighbor LEAFS next-hop-self
-   neighbor LEAFS bfd
-   neighbor LEAFS rib-in pre-policy retain all
-   neighbor LEAFS route-reflector-client
-   neighbor LEAFS password 7 1RuAvIkzlaIS2dTpf+q14g==
-   neighbor LEAFS send-community standard extended
-   neighbor OVERLAY peer group
-   neighbor OVERLAY update-source Loopback1
-   neighbor OVERLAY route-reflector-client
-   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
-   neighbor OVERLAY send-community extended
-   !
-   address-family evpn
-      neighbor OVERLAY activate
-   !
-   address-family ipv4
-      neighbor LEAFS activate
-      network 192.168.10.2/32
-!
-```
-### LEAF-1-1:
-```console
-!
-service routing protocols model multi-agent
-!
-hostname LEAF-1-1
-!
-vlan 10
-   name Tenant1_Service1
-!
-vlan 20
-   name Tenant1_Service2
-!
-vlan 30
-   name Tenant2_Service1
-!
-vlan 40
-   name Tenant2_Service2
-!
-vlan 901
-   name PtP_VRF_TENANT1_FW01
-!
-vlan 902
-   name PtP_VRF_TENANT2_FW01
-!
-vrf instance TENANT1
-!
-vrf instance TENANT2
-!
-interface Ethernet1
-   description SPINE-1-1 Eth1
-   no switchport
-   ip address 192.168.14.1/31
-   bfd interval 700 min-rx 500 multiplier 3
-!
-interface Ethernet2
-   description SPINE-1-2 Eth1
-   no switchport
-   ip address 192.168.14.7/31
-   bfd interval 700 min-rx 500 multiplier 3
-!
-interface Ethernet3
-   description FW01 Eth1
-   switchport trunk allowed vlan 901-902
-   switchport mode trunk
-!
-interface Ethernet8
-   description TENANT1 SERVICE1 SRV1
-   switchport access vlan 10
-!
-interface Loopback1
-   ip address 192.168.12.1/32
-!
-interface Loopback2
-   ip address 192.168.13.1/32
-!
-interface Vlan10
-   description TENANT1_SERVICE1
-   vrf TENANT1
-   ip address virtual 10.0.0.1/24
-!
-interface Vlan20
-   description TENANT1_SERVICE2
-   vrf TENANT1
-   ip address virtual 10.0.2.1/24
-!
-interface Vlan30
-   description TENANT2_SERVICE1
-   vrf TENANT2
-   ip address virtual 10.2.0.1/24
-!
-interface Vlan40
-   description TENANT2_SERVICE2
-   vrf TENANT2
-   ip address virtual 10.2.2.1/24
-!
-interface Vlan901
-   description PtP_VRF_TENANT1_FW01
-   vrf TENANT1
-   ip address 10.0.255.1/29
-!
-interface Vlan902
-   description PtP_VRF_TENANT2_FW01
-   vrf TENANT2
-   ip address 10.2.255.1/29
-!
-interface Vxlan1
-   vxlan source-interface Loopback2
-   vxlan udp-port 4789
-   vxlan vlan 10 vni 100010
-   vxlan vlan 20 vni 100020
-   vxlan vlan 30 vni 100030
-   vxlan vlan 40 vni 100040
-   vxlan vrf TENANT1 vni 1001
-   vxlan vrf TENANT2 vni 1002
-   vxlan learn-restrict any
-!
-ip routing
-ip routing vrf TENANT1
-ip routing vrf TENANT2
-!
-ip prefix-list TENANT1 seq 10 permit 10.0.0.0/16 eq 24
-ip prefix-list TENANT2 seq 10 permit 10.2.0.0/16 eq 24
-ip prefix-list default seq 10 permit 0.0.0.0/0
-!
-route-map TENANT1-in permit 10
-   match ip address prefix-list default
-!
-route-map TENANT1-in permit 20
-   match ip address prefix-list TENANT2
-!
-route-map TENANT1-in deny 30
-!
-route-map TENANT1-out permit 10
-   match ip address prefix-list TENANT1
-!
-route-map TENANT1-out deny 20
-!
-route-map TENANT2-in permit 10
-   match ip address prefix-list default
-!
-route-map TENANT2-in permit 20
-   match ip address prefix-list TENANT1
-!
-route-map TENANT2-in deny 30
-!
-route-map TENANT2-out permit 10
-   match ip address prefix-list TENANT2
-!
-route-map TENANT2-out deny 20
-!
-router bgp 65000
-   router-id 192.168.12.1
-   no bgp default ipv4-unicast
-   distance bgp 20 200 200
-   maximum-paths 4 ecmp 4
-   neighbor OVERLAY peer group
-   neighbor OVERLAY remote-as 65000
-   neighbor OVERLAY update-source Loopback1
-   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
-   neighbor OVERLAY send-community extended
-   neighbor SPINE peer group
-   neighbor SPINE remote-as 65000
-   neighbor SPINE next-hop-self
-   neighbor SPINE bfd
-   neighbor SPINE rib-in pre-policy retain all
-   neighbor SPINE password 7 hFVifvPlyMlVDYT87k+lyg==
-   neighbor SPINE send-community standard extended
-   neighbor 192.168.10.1 peer group OVERLAY
-   neighbor 192.168.10.2 peer group OVERLAY
-   neighbor 192.168.14.0 peer group SPINE
-   neighbor 192.168.14.6 peer group SPINE
-   !
-   vlan 10
-      rd 65000:100010
-      route-target both 65000:100010
-      redistribute learned
-   !
-   vlan 20
-      rd 65000:100020
-      route-target both 65000:100020
-      redistribute learned
-   !
-   vlan 30
-      rd 65000:10030
-      route-target both 65000:100030
-      redistribute learned
-   !
-   vlan 40
-      rd 65000:100040
-      route-target both 65000:100040
-      redistribute learned
-   !
-   address-family evpn
-      neighbor OVERLAY activate
-   !
-   address-family ipv4
-      neighbor SPINE activate
-      network 192.168.12.1/32
-      network 192.168.13.1/32
-   !
-   vrf TENANT1
-      rd 65000:1001
-      route-target import evpn 65000:1001
-      route-target export evpn 65000:1001
-      neighbor 10.0.255.3 remote-as 65500
-      neighbor 10.0.255.3 send-community standard extended
-      redistribute connected
-      !
-      address-family ipv4
-         neighbor 10.0.255.3 activate
-         neighbor 10.0.255.3 route-map TENANT1-in in
-         neighbor 10.0.255.3 route-map TENANT1-out out
-   !
-   vrf TENANT2
-      rd 65000:1002
-      route-target import evpn 65000:1002
-      route-target export evpn 65000:1002
-      neighbor 10.2.255.3 remote-as 65500
-      neighbor 10.2.255.3 send-community standard extended
-      redistribute connected
-      !
-      address-family ipv4
-         neighbor 10.2.255.3 activate
-         neighbor 10.2.255.3 route-map TENANT2-in in
-         neighbor 10.2.255.3 route-map TENANT2-out out
-!
-```
-### LEAF-1-2:
-```console
-!
-service routing protocols model multi-agent
-!
-hostname LEAF-1-2
-!
-vlan 10
-   name Tenant1_Service1
-!
-vlan 20
-   name Tenant1_Service2
-!
-vlan 30
-   name Tenant2_Service1
-!
-vlan 40
-   name Tenant2_Service2
-!
-vlan 901
-   name PtP_VRF_TENANT1_FW01
-!
-vlan 902
-   name PtP_VRF_TENANT2_FW01
-!
-vrf instance TENANT1
-!
-vrf instance TENANT2
-!
-interface Ethernet1
-   description SPINE-1-1 Eth2
-   no switchport
-   ip address 192.168.14.3/31
-   bfd interval 700 min-rx 500 multiplier 3
-!
-interface Ethernet2
-   description SPINE-1-2 Eth2
-   no switchport
-   ip address 192.168.14.9/31
-   bfd interval 700 min-rx 500 multiplier 3
-!
-interface Ethernet3
-   description FW01 Eth2
-   switchport trunk allowed vlan 901-902
-   switchport mode trunk
-!
-interface Ethernet7
-   description TENANT2 SERVICE1 SRV3
-   switchport access vlan 30
-!
-interface Ethernet8
-   description TENANT1 SERVICE2 SRV2
-   switchport access vlan 20
-!
-interface Loopback1
-   ip address 192.168.12.2/32
-!
-interface Loopback2
-   ip address 192.168.13.2/32
-!
-interface Vlan10
-   description TENANT1_SERVICE1
-   vrf TENANT1
-   ip address virtual 10.0.0.1/24
-!
-interface Vlan20
-   description TENANT1_SERVICE2
-   vrf TENANT1
-   ip address virtual 10.0.2.1/24
-!
-interface Vlan30
-   description TENANT2_SERVICE1
-   vrf TENANT2
-   ip address virtual 10.2.0.1/24
-!
-interface Vlan40
-   description TENANT2_SERVICE2
-   vrf TENANT2
-   ip address virtual 10.2.2.1/24
-!
-interface Vlan901
-   description PtP_VRF_TENANT1_FW01
-   vrf TENANT1
-   ip address 10.0.255.2/29
-!
-interface Vlan902
-   description PtP_VRF_TENATN2_FW01
-   vrf TENANT2
-   ip address 10.2.255.2/29
-!
-interface Vxlan1
-   vxlan source-interface Loopback2
-   vxlan udp-port 4789
-   vxlan vlan 10 vni 100010
-   vxlan vlan 20 vni 100020
-   vxlan vlan 30 vni 100030
-   vxlan vlan 40 vni 100040
-   vxlan vrf TENANT1 vni 1001
-   vxlan vrf TENANT2 vni 1002
-   vxlan learn-restrict any
-!
-ip routing
-ip routing vrf TENANT1
-ip routing vrf TENANT2
-!
-router bgp 65000
-   router-id 192.168.12.2
-   no bgp default ipv4-unicast
-   distance bgp 20 200 200
-   maximum-paths 4 ecmp 4
-   neighbor OVERLAY peer group
-   neighbor OVERLAY remote-as 65000
-   neighbor OVERLAY update-source Loopback1
-   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
-   neighbor OVERLAY send-community extended
-   neighbor SPINE peer group
-   neighbor SPINE remote-as 65000
-   neighbor SPINE next-hop-self
-   neighbor SPINE bfd
-   neighbor SPINE rib-in pre-policy retain all
-   neighbor SPINE password 7 hFVifvPlyMlVDYT87k+lyg==
-   neighbor SPINE send-community standard extended
-   neighbor 192.168.10.1 peer group OVERLAY
-   neighbor 192.168.10.2 peer group OVERLAY
-   neighbor 192.168.14.2 peer group SPINE
-   neighbor 192.168.14.8 peer group SPINE
-   !
-   vlan 10
-      rd 65000:100010
-      route-target both 65000:100010
-      redistribute learned
-   !
-   vlan 20
-      rd 65000:100020
-      route-target both 65000:100020
-      redistribute learned
-   !
-   vlan 30
-      rd 65000:100030
-      route-target both 65000:100030
-      redistribute learned
-   !
-   vlan 40
-      rd 65000:100040
-      route-target both 65000:100040
-      redistribute learned
-   !
-   address-family evpn
-      neighbor OVERLAY activate
-   !
-   address-family ipv4
-      neighbor SPINE activate
-      network 192.168.12.2/32
-      network 192.168.13.2/32
-   !
-   vrf TENANT1
-      rd 65000:1001
-      route-target import evpn 65000:1001
-      route-target export evpn 65000:1001
-      neighbor 10.0.255.3 remote-as 65500
-      neighbor 10.0.255.3 send-community standard extended
-      redistribute connected
-      !
-      address-family ipv4
-         neighbor 10.0.255.3 activate
-         neighbor 10.0.255.3 route-map TENANT1-in in
-         neighbor 10.0.255.3 route-map TENANT1-out out
-   !
-   vrf TENANT2
-      rd 65000:1002
-      route-target import evpn 65000:1002
-      route-target export evpn 65000:1002
-      neighbor 10.2.255.3 remote-as 65500
-      neighbor 10.2.255.3 send-community standard extended
-      redistribute connected
-      !
-      address-family ipv4
-      neighbor 10.2.255.3 route-map TENANT2-in in
-      neighbor 10.2.255.3 route-map TENANT2-out out
-!
-```
-### LEAF-1-3:
-```console
-!
-service routing protocols model multi-agent
-!
-hostname LEAF-1-3
-!
-vlan 10
-   name Tenant1_Service1
-!
-vlan 20
-   name Tenant1_Service2
-!
-vlan 30
-   name Tenant2_Service1
-!
-vlan 40
-   name Tenant2_Service2
-!
-vrf instance TENANT1
-!
-vrf instance TENANT2
-!
-interface Ethernet1
-   description SPINE-1-1 Eth3
-   no switchport
-   ip address 192.168.14.5/31
-   bfd interval 700 min-rx 500 multiplier 3
-!
-interface Ethernet2
-   description SPINE-1-2 Eth3
-   no switchport
-   ip address 192.168.14.11/31
-   bfd interval 700 min-rx 500 multiplier 3
-!
-interface Ethernet8
-   description TENANT2 SERVICE2 SRV4
-   switchport access vlan 40
-!
-interface Loopback1
-   ip address 192.168.12.3/32
-!
-interface Loopback2
-   ip address 192.168.13.3/32
-!
-interface Vlan10
-   description TENANT1_SERVICE1
-   vrf TENANT1
-   ip address virtual 10.0.0.1/24
-!
-interface Vlan20
-   description TENANT1_SERVICE2
-   vrf TENANT1
-   ip address virtual 10.0.2.1/24
-!
-interface Vlan30
-   description TENANT2_SERVICE1
-   vrf TENANT2
-   ip address virtual 10.2.0.1/24
-!
-interface Vlan40
-   description TENANT2_SERVICE2
-   vrf TENANT2
-   ip address virtual 10.2.2.1/24
-!
-interface Vxlan1
-   vxlan source-interface Loopback2
-   vxlan udp-port 4789
-   vxlan vlan 10 vni 100010
-   vxlan vlan 20 vni 100020
-   vxlan vlan 30 vni 100030
-   vxlan vlan 40 vni 100040
-   vxlan vrf TENANT1 vni 1001
-   vxlan vrf TENANT2 vni 1002
-   vxlan learn-restrict any
-!
-ip routing
-ip routing vrf TENANT1
-ip routing vrf TENANT2
-!
-router bgp 65000
-   router-id 192.168.12.3
-   no bgp default ipv4-unicast
-   distance bgp 20 200 200
-   maximum-paths 4 ecmp 4
-   neighbor OVERLAY peer group
-   neighbor OVERLAY remote-as 65000
-   neighbor OVERLAY update-source Loopback1
-   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
-   neighbor OVERLAY send-community extended
-   neighbor SPINE peer group
-   neighbor SPINE remote-as 65000
-   neighbor SPINE next-hop-self
-   neighbor SPINE bfd
-   neighbor SPINE rib-in pre-policy retain all
-   neighbor SPINE password 7 hFVifvPlyMlVDYT87k+lyg==
-   neighbor SPINE send-community standard extended
-   neighbor 192.168.10.1 peer group OVERLAY
-   neighbor 192.168.10.2 peer group OVERLAY
-   neighbor 192.168.14.4 peer group SPINE
-   neighbor 192.168.14.10 peer group SPINE
-   !
-   vlan 10
-      rd 65000:100010
-      route-target both 65000:100010
-      redistribute learned
-   !
-   vlan 20
-      rd 65000:100020
-      route-target both 65000:100020
-      redistribute learned
-   !
-   vlan 30
-      rd 65000:100030
-      route-target both 65000:100030
-      redistribute learned
-   !
-   vlan 40
-      rd 65000:10040
-      route-target both 65000:10040
-      redistribute learned
-   !
-   address-family evpn
-      neighbor OVERLAY activate
-   !
-   address-family ipv4
-      neighbor SPINE activate
-      network 192.168.12.3/32
-      network 192.168.13.3/32
-   !
-   vrf TENANT1
-      rd 65000:1001
-      route-target import evpn 65000:1001
-      route-target export evpn 65000:1001
-      redistribute connected
-   !
-   vrf TENANT2
-      rd 65000:1002
-      route-target import evpn 65000:1002
-      route-target export evpn 65000:1002
-      redistribute connected
-!
-```
-
-### FW01:
-```console
-!
-hostname FW01
-!
-vlan 901
-   name PtP_VRF_TENANT1_FW01
-!
-vlan 902
-   name PtP_VRF_TENANT2_FW01
-!
-interface Ethernet1
-   description LEAF-1-1 Eth3
-   switchport trunk allowed vlan 901-902
-   switchport mode trunk
-!
-interface Ethernet2
-   description LEAF-1-2 Eth3
-   switchport trunk allowed vlan 901-902
-   switchport mode trunk
-!
-interface Ethernet3
-   description INTERNET Eth1
-   no switchport
-   ip address 91.201.200.2/24
-!
-interface Vlan901
-   description PtP_VRF_TENANT1_FW01
-   ip address 10.0.255.3/29
-!
-interface Vlan902
-   description PtP_VRF_TENANT2_FW01
-   ip address 10.2.255.3/29
-!
-ip routing
-!
-router bgp 65500
-   router-id 91.201.200.2
-   neighbor 10.0.255.1 remote-as 65000
-   neighbor 10.0.255.1 remove-private-as all replace-as
-   neighbor 10.0.255.1 send-community standard extended
-   neighbor 10.0.255.2 remote-as 65000
-   neighbor 10.0.255.2 remove-private-as all replace-as
-   neighbor 10.0.255.2 send-community standard extended
-   neighbor 10.2.255.1 remote-as 65000
-   neighbor 10.2.255.1 remove-private-as all replace-as
-   neighbor 10.2.255.1 send-community standard extended
-   neighbor 10.2.255.2 remote-as 65000
-   neighbor 10.2.255.2 remove-private-as all replace-as
-   neighbor 10.2.255.2 send-community standard extended
-   neighbor 91.201.200.1 remote-as 10
-   neighbor 91.201.200.1 send-community standard extended
-   redistribute connected
-   !
-   address-family ipv4
-      neighbor 10.0.255.1 activate
-      neighbor 10.0.255.1 default-originate
-      neighbor 10.0.255.2 activate
-      neighbor 10.0.255.2 default-originate
-      neighbor 10.2.255.1 activate
-      neighbor 10.2.255.1 default-originate
-      neighbor 10.2.255.2 activate
-      neighbor 10.2.255.2 default-originate
-      neighbor 91.201.200.1 activate
-!
-```
-
-### INTERNET:
-```console
-!
-hostname INTERNET
-!
-interface Ethernet1
-   description FW01 Eth3
-   no switchport
-   ip address 91.201.200.1/24
-!
-interface Loopback0
-   description INTERNET
-   ip address 8.8.8.8/32
-!
-ip routing
-!
-router bgp 10
-   router-id 8.8.8.8
-   distance bgp 20 200 200
-   neighbor 91.201.200.2 remote-as 65500
-   neighbor 91.201.200.2 send-community standard extended
-   !
-   address-family ipv4
-      neighbor 91.201.200.2 activate
-      network 8.8.8.8/32
-!
-```
 
 ## Вывод комманд маршрутизации
 ### SPINE-1-1:
