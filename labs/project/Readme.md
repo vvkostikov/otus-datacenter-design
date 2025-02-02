@@ -350,21 +350,32 @@ router bgp 65XXXX
 ```
 
 ### Конфиги коммутаторов:
-![Все конфиги](/labs/project/configs/)
+[Все конфиги](/labs/project/configs/)
 #### Датацентр1:
 [SPINE-1-1](/labs/project/configs/SPINE-1-1_cfg.txt)
-![SPINE-1-2](/labs/project/configs/SPINE-1-2_cfg.txt)
-![LEAF-1-1](/labs/project/configs/LEAF-1-1_cfg.txt)
-![LEAF-1-2](/labs/project/configs/LEAF-1-2_cfg.txt)
-![LEAF-1-3](/labs/project/configs/LEAF-1-3_cfg.txt)
-![LEAF-1-4](/labs/project/configs/LEAF-1-4_cfg.txt)
+
+[SPINE-1-2](/labs/project/configs/SPINE-1-2_cfg.txt)
+
+[LEAF-1-1](/labs/project/configs/LEAF-1-1_cfg.txt)
+
+[LEAF-1-2](/labs/project/configs/LEAF-1-2_cfg.txt)
+
+[LEAF-1-3](/labs/project/configs/LEAF-1-3_cfg.txt)
+
+[LEAF-1-4](/labs/project/configs/LEAF-1-4_cfg.txt)
+
 #### Датацентр2:
 [SPINE-2-1](/labs/project/configs/SPINE-2-1_cfg.txt)
-![SPINE-2-2](/labs/project/configs/SPINE-2-2_cfg.txt)
-![LEAF-2-1](/labs/project/configs/LEAF-2-1_cfg.txt)
-![LEAF-2-2](/labs/project/configs/LEAF-2-2_cfg.txt)
-![LEAF-2-3](/labs/project/configs/LEAF-2-3_cfg.txt)
-![LEAF-2-4](/labs/project/configs/LEAF-2-4_cfg.txt)
+
+[SPINE-2-2](/labs/project/configs/SPINE-2-2_cfg.txt)
+
+[LEAF-2-1](/labs/project/configs/LEAF-2-1_cfg.txt)
+
+[LEAF-2-2](/labs/project/configs/LEAF-2-2_cfg.txt)
+
+[LEAF-2-3](/labs/project/configs/LEAF-2-3_cfg.txt)
+
+[LEAF-2-4](/labs/project/configs/LEAF-2-4_cfg.txt)
 
 ## Вывод комманд маршрутизации
 ### SPINE-1-1:
