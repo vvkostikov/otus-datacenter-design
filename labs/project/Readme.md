@@ -304,7 +304,7 @@ vrf <TENANT1>
 ```
 
 ### SPINE-1-1:
-![alt text](/configs/SPINE2-1_cfg.txt)
+![SPINE-1-1](labs/project/configs/SPINE2-1_cfg.txt)
 ```console
 !
 service routing protocols model multi-agent
