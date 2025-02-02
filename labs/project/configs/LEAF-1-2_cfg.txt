@@ -1,0 +1,118 @@
+!
+service routing protocols model multi-agent
+!
+hostname LEAF-1-2
+!
+vlan 10
+   name Tenant1_Service1
+!
+vlan 20
+   name Tenant1_Service2
+!
+vlan 30
+   name Tenant2_Service1
+!
+vrf instance TENANT1
+!
+vrf instance TENANT2
+!
+interface Ethernet1
+   description SPINE-1-1 Eth2
+   no switchport
+   ip address 192.168.14.3/31
+   bfd interval 700 min-rx 500 multiplier 3
+!
+interface Ethernet2
+   description SPINE-1-2 Eth2
+   no switchport
+   ip address 192.168.14.9/31
+   bfd interval 700 min-rx 500 multiplier 3
+!
+interface Ethernet8
+   description TENANT2 SERVICE1 SRV3
+   switchport access vlan 30
+!
+interface Loopback1
+   ip address 192.168.12.2/32
+!
+interface Loopback2
+   ip address 192.168.13.2/32
+!
+interface Vlan10
+   description TENANT1_SERVICE1
+   vrf TENANT1
+   ip address virtual 10.0.0.1/24
+!
+interface Vlan20
+   description TENANT1_SERVICE2
+   vrf TENANT1
+   ip address virtual 10.0.2.1/24
+!
+interface Vlan30
+   description TENANT2_SERVICE1
+   vrf TENANT2
+   ip address virtual 10.2.0.1/24
+!
+interface Vxlan1
+   vxlan source-interface Loopback2
+   vxlan udp-port 4789
+   vxlan vlan 10 vni 100010
+   vxlan vlan 20 vni 100020
+   vxlan vlan 30 vni 200030
+   vxlan vrf TENANT1 vni 1001
+   vxlan vrf TENANT2 vni 1002
+   vxlan learn-restrict any
+!
+ip virtual-router mac-address 00:01:00:d5:5d:c0
+!
+ip routing
+ip routing vrf TENANT1
+ip routing vrf TENANT2
+!
+router bgp 65000
+   router-id 192.168.12.2
+   no bgp default ipv4-unicast
+   distance bgp 20 200 200
+   maximum-paths 4 ecmp 4
+   neighbor OVERLAY peer group
+   neighbor OVERLAY remote-as 65000
+   neighbor OVERLAY update-source Loopback1
+   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
+   neighbor OVERLAY send-community extended
+   neighbor SPINE peer group
+   neighbor SPINE remote-as 65000
+   neighbor SPINE next-hop-self
+   neighbor SPINE rib-in pre-policy retain all
+   neighbor SPINE password 7 hFVifvPlyMlVDYT87k+lyg==
+   neighbor SPINE send-community standard extended
+   neighbor 192.168.10.1 peer group OVERLAY
+   neighbor 192.168.10.2 peer group OVERLAY
+   neighbor 192.168.14.2 peer group SPINE
+   neighbor 192.168.14.8 peer group SPINE
+   redistribute connected
+   !
+   vlan 30
+      rd 65000:1001
+      route-target both 65000:200030
+      redistribute learned
+   !
+   address-family evpn
+      neighbor OVERLAY activate
+   !
+   address-family ipv4
+      neighbor SPINE activate
+      network 192.168.12.2/32
+      network 192.168.13.2/32
+   !
+   vrf TENANT1
+      rd 65000:1001
+      route-target import evpn 65000:1001
+      route-target export evpn 65000:1001
+      redistribute connected
+   !
+   vrf TENANT2
+      rd 65000:1002
+      route-target import evpn 65000:1002
+      route-target export evpn 65000:1002
+      redistribute connected
+!

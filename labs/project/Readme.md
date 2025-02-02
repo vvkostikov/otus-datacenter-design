@@ -67,12 +67,27 @@ RD - 65002:100010
 
 RT - 65002:100010
 
+## Описание выбора сегмента ESI и RT с LACP SYSTEM-ID:
+
+ethernet-segmet identifier 0000:<номер датацентра в 4 значном формате>:<номер Tenant в 4 значном формате>:<номер сервиса в 4 значном формате>:<номер ESI порядковый в 4 значном формате>
+
+route-target использует последние 12 цифр ESI в формате XX:XX:XX:XX:XX:XX
+
+lacp system-id также использует последние 12 цифр ESI в формате XXXX.XXXX.XXXX
+
+Соответсвенно в нашем случае для Датацентра 1 Tenant 1 Сервиса 2 ESI 1:
+
+ethernet-segmet identifier 0000:0001:0001:0002:0001
+
+route-target import 00:01:00:02:00:01
+
+lacp system-id 0001.0002.0001
+
 ## Описание выбора виртуального MAC:
 
 Чтобы избежать влияние смены MAC адреса шлюза при перемещении Любого устройства в сети, для всех LEAF с Anycast-gateway прописано использовать виртуальный MAC адрес.
 
-Он взят с LEAF-1-1:
-ip virtual-router mac-address c001.cafe.babe
+ip virtual-router mac-address 0001.00d5.5dc0
 
 ## Описание DCI:
 
@@ -254,6 +269,7 @@ router bgp 65XXXX
    neighbor BGW peer group
    neighbor BGW remote-as 65XXXX
    neighbor BGW password 123test
+   neighbor BGW bfd
    neighbor BGW send-community extended
 
    neighbor <BGW PtP IP> peer group BGW
@@ -301,45 +317,54 @@ interface Vlan <Номер VLAN>
    ip address virtual <IP>
 
 ```
-
-### Типовая конфигурация PREFIX-LIST, ROUTE-MAP и BGP в VRF:
+### Типовая конфигурация ESI на Port-channel:
 ```console
-ip prefix-list TENANT1 seq 10 permit 10.0.0.0/16 eq 24
-ip prefix-list TENANT2 seq 10 permit 10.2.0.0/16 eq 24
-ip prefix-list default seq 10 permit 0.0.0.0/0
 !
-route-map TENANT1-in permit 10
-   match ip address prefix-list default
+interface Port-Channel <X>
+   evpn ethernet-segment
+      identifier XXXX:XXXX:XXXX:XXXX:XXXX
+      route-target import XX:XX:XX:XX:XX:XX
+   lacp system-id XX:XX:XX:XX:XX:XX
+```
+
+### Типовая конфигурация растягивания L2VNI между Датацентрами через DCI MULTISITE на BGW:
+```console
 !
-route-map TENANT1-in permit 20
-   match ip address prefix-list TENANT2
+router bgp 65XXXX
+   vlan <Номер VLAN>>
+      rd <AS:VNI>
+      rd evpn domain remote <65500:VNI>
+      route-target both <AS:VNI>
+      route-target import export evpn domain remote <65500:VNI>
+      redistribute learned
 !
-route-map TENANT1-in deny 30
+```
+
+### Типовая конфигурация растягивания L3VNI между Датацентрами через DCI MULTISITE на BGW:
+```console
 !
-route-map TENANT1-out permit 10
-   match ip address prefix-list TENANT1
-!
-route-map TENANT1-out deny 20
-!
-router bgp <ASN>
-vrf <TENANT1>
-      neighbor <EXTERNAL_ROUTER_IP> remote-as <ASN>
-      neighbor <EXTERNAL_ROUTER_IP> send-community standard extended
-      redistribute connected
-      !
-      address-family ipv4
-         neighbor <EXTERNAL_ROUTER_IP> activate
-         neighbor <EXTERNAL_ROUTER_IP> route-map TENANT1-in in
-         neighbor <EXTERNAL_ROUTER_IP> route-map TENANT1-out out
-   !
+router bgp 65XXXX
+   address-family evpn
+      neighbor BGW next-hop-self received-evpn-routes route-type ip-prefix inter-domain
 !
 ```
 
 ### Конфиги коммутаторов:
 ![Все конфиги](/labs/project/configs/)
 #### Датацентр1:
+[SPINE-1-1](/labs/project/configs/SPINE-1-1_cfg.txt)
+![SPINE-1-2](/labs/project/configs/SPINE-1-2_cfg.txt)
+![LEAF-1-1](/labs/project/configs/LEAF-1-1_cfg.txt)
+![LEAF-1-2](/labs/project/configs/LEAF-1-2_cfg.txt)
+![LEAF-1-3](/labs/project/configs/LEAF-1-3_cfg.txt)
+![LEAF-1-4](/labs/project/configs/LEAF-1-4_cfg.txt)
 #### Датацентр2:
-![SPINE-2-1](/labs/project/configs/SPINE2-1_cfg.txt)
+[SPINE-2-1](/labs/project/configs/SPINE-2-1_cfg.txt)
+![SPINE-2-2](/labs/project/configs/SPINE-2-2_cfg.txt)
+![LEAF-2-1](/labs/project/configs/LEAF-2-1_cfg.txt)
+![LEAF-2-2](/labs/project/configs/LEAF-2-2_cfg.txt)
+![LEAF-2-3](/labs/project/configs/LEAF-2-3_cfg.txt)
+![LEAF-2-4](/labs/project/configs/LEAF-2-4_cfg.txt)
 
 ## Вывод комманд маршрутизации
 ### SPINE-1-1:

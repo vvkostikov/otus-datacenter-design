@@ -1,0 +1,118 @@
+!
+service routing protocols model multi-agent
+!
+hostname LEAF-1-3
+!
+vlan 10
+   name Tenant1_Service1
+!
+vrf instance TENANT1
+!
+vrf instance TENANT2
+!
+interface Ethernet1
+   description SPINE-1-1 Eth3
+   no switchport
+   ip address 192.168.14.5/31
+   bfd interval 700 min-rx 500 multiplier 3
+!
+interface Ethernet2
+   description SPINE-1-2 Eth3
+   no switchport
+   ip address 192.168.14.11/31
+   bfd interval 700 min-rx 500 multiplier 3
+!
+interface Ethernet3
+   description Lef-2-2 Eth3
+   no switchport
+   ip address 172.30.254.2/31
+   bfd interval 700 min-rx 500 multiplier 3
+!
+interface Loopback1
+   ip address 192.168.12.3/32
+!
+interface Loopback2
+   ip address 192.168.13.3/32
+!
+interface Vxlan1
+   vxlan source-interface Loopback2
+   vxlan udp-port 4789
+   vxlan vlan 10 vni 100010
+   vxlan vrf TENANT1 vni 1001
+   vxlan vrf TENANT2 vni 1002
+   vxlan learn-restrict any
+!
+ip virtual-router mac-address 00:01:00:d5:5d:c0
+!
+ip routing
+ip routing vrf TENANT1
+ip routing vrf TENANT2
+!
+ip prefix-list Loopbacks-Local seq 10 permit 192.168.13.3/32
+!
+route-map BGW-IPV4-out permit 10
+   match ip address prefix-list Loopbacks-Local
+!
+route-map BGW-IPV4-out deny 1000
+!
+router bgp 65000
+   router-id 192.168.12.3
+   no bgp default ipv4-unicast
+   distance bgp 20 200 200
+   maximum-paths 4 ecmp 4
+   neighbor BGW peer group
+   neighbor BGW remote-as 65002
+   no neighbor BGW next-hop-unchanged
+   no neighbor BGW allowas-in
+   neighbor BGW password 7 UnLeOpjU4lF2fjEImIsVpw==
+   neighbor BGW send-community extended
+   neighbor OVERLAY peer group
+   neighbor OVERLAY remote-as 65000
+   neighbor OVERLAY update-source Loopback1
+   neighbor OVERLAY route-reflector-client
+   neighbor OVERLAY password 7 rXi9hgRNfLyRVaxnuxy+/Q==
+   neighbor OVERLAY send-community extended
+   neighbor SPINE peer group
+   neighbor SPINE remote-as 65000
+   neighbor SPINE next-hop-self
+   neighbor SPINE rib-in pre-policy retain all
+   neighbor SPINE password 7 hFVifvPlyMlVDYT87k+lyg==
+   neighbor SPINE send-community standard extended
+   neighbor 172.30.254.3 peer group BGW
+   neighbor 192.168.10.1 peer group OVERLAY
+   neighbor 192.168.10.2 peer group OVERLAY
+   neighbor 192.168.14.4 peer group SPINE
+   neighbor 192.168.14.10 peer group SPINE
+   !
+   vlan 10
+      rd 65000:100010
+      rd evpn domain remote 65500:10010
+      route-target both 65000:100010
+      route-target import export evpn domain remote 65500:100010
+      redistribute learned
+   !
+   address-family evpn
+      neighbor BGW activate
+      neighbor BGW domain remote
+      neighbor BGW next-hop-self received-evpn-routes route-type ip-prefix inter-domain
+      neighbor OVERLAY activate
+   !
+   address-family ipv4
+      neighbor BGW activate
+      neighbor BGW route-map BGW-IPV4-out out
+      neighbor SPINE activate
+      network 192.168.12.3/32
+      network 192.168.13.3/32
+   !
+   vrf TENANT1
+      rd 65000:1001
+      route-target import evpn 65000:1001
+      route-target export evpn 65000:1001
+      redistribute connected
+   !
+   vrf TENANT2
+      rd 65000:1002
+      route-target import evpn 65000:1002
+      route-target export evpn 65000:1002
+      redistribute connected
+!
